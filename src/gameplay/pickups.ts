@@ -3,16 +3,14 @@
 import * as THREE from 'three';
 import type { World } from '../world/world.ts';
 import type { PickupRecord } from '../sim/save/schema.ts';
-import { itemDef } from '../data/items.ts';
 import { randomId } from '../core/rng.ts';
+import { makeItemMesh } from './itemMesh.ts';
 
 interface Pickup {
   record: PickupRecord;
   mesh: THREE.Group;
   phase: number;
 }
-
-const KIND_COLORS: Record<string, number> = { fish: 0x5aa0d8, junk: 0x9a8a6a, can: 0xd8d8d8, weapon: 0x444444, ammo: 0x6b5a3a, clothing: 0xd9407a, consumable: 0xe8c53a, misc: 0x3f9a4a, rod: 0x8a6a4a };
 
 export class PickupSystem {
   private world: World;
@@ -30,15 +28,13 @@ export class PickupSystem {
   }
 
   private add(rec: PickupRecord): void {
-    const def = itemDef(rec.itemId);
     const g = new THREE.Group();
-    const col = rec.color ? new THREE.Color(rec.color) : new THREE.Color(KIND_COLORS[def.kind] ?? 0xffffff);
-    let body: THREE.Mesh;
-    if (def.kind === 'fish') body = new THREE.Mesh(new THREE.SphereGeometry(0.16, 10, 8).scale(1.6, 0.6, 0.5), new THREE.MeshStandardMaterial({ color: col, roughness: 0.35, metalness: 0.3 }));
-    else if (def.kind === 'can') body = new THREE.Mesh(new THREE.CylinderGeometry(0.033, 0.033, 0.122, 12), new THREE.MeshStandardMaterial({ color: col, roughness: 0.35, metalness: 0.9 }));
-    else if (def.kind === 'clothing') body = new THREE.Mesh(new THREE.BoxGeometry(0.34, 0.1, 0.26), new THREE.MeshStandardMaterial({ color: col, roughness: 0.9 }));
-    else body = new THREE.Mesh(new THREE.BoxGeometry(0.22, 0.22, 0.22), new THREE.MeshStandardMaterial({ color: col, roughness: 0.7 }));
-    body.castShadow = true;
+    // the item mesh lies on its side above the ground marker, spinning slowly
+    const body = new THREE.Group();
+    const item = makeItemMesh(rec.itemId, rec.color);
+    item.rotation.z = -Math.PI / 2;
+    item.position.x = -0.12;
+    body.add(item);
     body.position.y = 0.18;
     g.add(body);
     const ring = new THREE.Mesh(new THREE.RingGeometry(0.28, 0.34, 24), new THREE.MeshBasicMaterial({ color: 0xffe9a8, transparent: true, opacity: 0.55, side: THREE.DoubleSide }));

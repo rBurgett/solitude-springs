@@ -8,6 +8,7 @@ import { Player } from './actors/player.ts';
 import { ThirdPersonCamera } from './actors/camera.ts';
 import { FishingSystem, type FishingHost } from './gameplay/fishing.ts';
 import { PickupSystem } from './gameplay/pickups.ts';
+import { HeldItem } from './gameplay/heldItem.ts';
 import { NpcManager } from './gameplay/npcs.ts';
 import type { Npc } from './actors/npc.ts';
 import { Conversation, type ConversationHost } from './gameplay/conversation.ts';
@@ -85,6 +86,7 @@ export class Game {
   readonly camera: ThirdPersonCamera;
   readonly fishing: FishingSystem;
   readonly pickups: PickupSystem;
+  readonly held: HeldItem;
   readonly npcs: NpcManager;
   readonly hud: Hud;
   readonly bus = new EventBus();
@@ -211,6 +213,7 @@ export class Game {
     if ('save' in source) this.pickups.restore(source.save.world.pickups);
     this.npcs = new NpcManager(this.world);
     this.fishing = new FishingSystem(this.world, player, this.fishingHost());
+    this.held = new HeldItem(player.character);
     this.input = new Input(canvas, host.bindings, { onCaptureLost: () => this.onCaptureLost() });
     this.console = new DevConsole(host.ui, this.commands());
     this.console.onToggle = (open) => {
@@ -307,6 +310,7 @@ export class Game {
     this.hud.dispose();
     this.console.root.remove();
     this.fishing.dispose();
+    this.held.dispose();
     this.pickups.clear();
     this.npcs.despawnAll();
     this.player.dispose();
@@ -375,6 +379,7 @@ export class Game {
       if (intent.jump && wasGrounded && this.player.grounded === false) this.host.audio?.jump();
       if (!wasGrounded && this.player.grounded && this.player.airTime === 0) this.host.audio?.land();
     }
+    this.updateRodSelection();
     this.npcs.step(dt);
     this.world.physics.step();
     this.footsteps();
@@ -568,10 +573,12 @@ export class Game {
     this.host.audio?.uiClick();
   }
 
+  /** The selected hotbar item goes into the hand: the rod through the fishing system, anything else as its mesh. */
   private updateRodSelection(): void {
     const sel = selectedStack(this.inventory);
     const rod = !!sel && itemDef(sel.id).kind === 'rod';
     this.fishing.setRodOut(rod);
+    this.held.set(sel && !rod ? sel.id : null, sel?.color);
   }
 
   applyWornOutfit(): void {
@@ -1571,7 +1578,7 @@ export class Game {
       run: (line: string) => this.console.run(line),
       state: () => ({
         pos: this.player.feet.toArray(), yaw: this.player.yaw, grounded: this.player.grounded, speed: this.player.speed, anim: this.player.currentAnim(), clock: { ...this.clock }, phase: phaseOf(this.clock), fishing: this.fishing.state.phase, lineOut: this.fishing.lineOut,
-        biteScheduled: Number.isFinite(this.fishing.state.biteAt) && !!this.fishing.state.pending, fishingTimer: this.fishing.state.timer,
+        biteScheduled: Number.isFinite(this.fishing.state.biteAt) && !!this.fishing.state.pending, fishingTimer: this.fishing.state.timer, held: this.held.itemKey, rodOut: this.fishing.rodOut,
         inventory: this.inventory.slots.filter((s): s is NonNullable<typeof s> => !!s).map((s) => `${s.id}×${s.count}`), worn: outfitOf(this.inventory).garments, wornIds: Object.fromEntries(Object.entries(this.inventory.worn).map(([k, v]) => [k, v?.id])), selected: this.inventory.selected,
         stats: { ...this.stats }, achievements: Object.keys(this.achievements), overlay: this.overlay, serenity: this.serenity, hearts: this.health.hearts, zone: this.fishing.currentZone, pickups: this.pickups.count,
         zones: Object.fromEntries([...this.zones].map(([id, z]) => [id, { population: z.population, trash: z.trash, cans: this.canPickupIds(id).length }])),
