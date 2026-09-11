@@ -94,6 +94,12 @@ export class World {
       const len = b.from.distanceTo(b.to);
       const yaw = Math.atan2(b.to.x - b.from.x, b.to.z - b.from.z);
       physics.addBox(center.clone().setY(center.y - 0.15), new THREE.Vector3(b.width / 2, 0.15, len / 2), yaw);
+      // rope rails: a thin wall along each side so nobody walks off the deck (the ends stay open)
+      for (const side of [-1, 1]) {
+        const off = side * (b.width / 2 + 0.08);
+        const railCenter = new THREE.Vector3(center.x + Math.cos(yaw) * off, center.y + 0.55, center.z - Math.sin(yaw) * off);
+        physics.addBox(railCenter, new THREE.Vector3(0.08, 0.6, len / 2), yaw);
+      }
     }
     physics.addBox(dock.deck.center, dock.deck.half, 0);
     for (const c of props.colliders) physics.addBox(c.center, c.half, c.yaw);
