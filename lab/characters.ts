@@ -12,6 +12,9 @@ const params = new URLSearchParams(location.search);
 const candidateId = params.get('candidate') || 'c';
 const shot = params.get('shot') || 'lineup';
 const time = (params.get('time') || 'day') as TimeOfDay;
+const clipParam = params.get('clip') || undefined;
+const libParam = (params.get('lib') || undefined) as FigureSpec['lib'];
+const phaseParam = params.has('phase') ? Number(params.get('phase')) : undefined;
 const W = 1280;
 const H = 720;
 const canvas = document.getElementById('lab-canvas') as HTMLCanvasElement;
@@ -28,8 +31,8 @@ const SKIN_M = '#c9946a';
 const SKIN_F = '#b97a52';
 const HAIR_M = '#3b2416';
 const HAIR_F = '#1b1512';
-function spec(sex: 'male' | 'female', outfit: FigureSpec['outfit'], pose: FigureSpec['pose']): FigureSpec {
-  return { sex, outfit, pose, skin: sex === 'male' ? SKIN_M : SKIN_F, hair: sex === 'male' ? HAIR_M : HAIR_F, shirt: '#1aa7a1', pants: '#2b3350', dress: '#d9407a' };
+function spec(sex: 'male' | 'female', outfit: FigureSpec['outfit'], pose: FigureSpec['pose'], extra: Partial<FigureSpec> = {}): FigureSpec {
+  return { sex, outfit, pose, skin: sex === 'male' ? SKIN_M : SKIN_F, hair: sex === 'male' ? HAIR_M : HAIR_F, shirt: '#1aa7a1', pants: '#2b3350', dress: '#d9407a', clip: clipParam, lib: libParam, phase: phaseParam, ...extra };
 }
 const Q = Math.PI / 4;
 function slots(): Slot[] {
@@ -52,6 +55,47 @@ function slots(): Slot[] {
         { label: 'M walk 3/4', spec: spec('male', 'default', 'walk'), yaw: Q },
         { label: 'M walk side', spec: spec('male', 'default', 'walk'), yaw: Math.PI / 2 },
         { label: 'F walk 3/4', spec: spec('female', 'default', 'walk'), yaw: -Q },
+      ];
+    case 'anim': {
+      // one clip, both bodies, four phases: read left to right as a flip-book
+      const ph = (k: number): number => (phaseParam ?? 0) + k;
+      return [
+        { label: 'M 0%', spec: spec('male', 'default', 'idle', { phase: ph(0) }), yaw: Q },
+        { label: 'M 25%', spec: spec('male', 'default', 'idle', { phase: ph(0.25) }), yaw: Q },
+        { label: 'M 50% side', spec: spec('male', 'default', 'idle', { phase: ph(0.5) }), yaw: Math.PI / 2 },
+        { label: 'M 75% front', spec: spec('male', 'default', 'idle', { phase: ph(0.75) }), yaw: 0 },
+        { label: 'F 0%', spec: spec('female', 'default', 'idle', { phase: ph(0) }), yaw: -Q },
+        { label: 'F 50% side', spec: spec('female', 'default', 'idle', { phase: ph(0.5) }), yaw: -Math.PI / 2 },
+        { label: 'F 75% front', spec: spec('female', 'default', 'idle', { phase: ph(0.75) }), yaw: 0 },
+      ];
+    }
+    case 'skins': {
+      const sex = (params.get('sex') || 'male') as 'male' | 'female';
+      return Array.from({ length: 10 }, (_, i) => ({ label: `skin ${i}`, spec: spec(sex, 'underwear', 'idle', { skinIndex: i, phase: 0 }), yaw: 0 }));
+    }
+    case 'hair': {
+      const sex = (params.get('sex') || 'male') as 'male' | 'female';
+      const styles = sex === 'male' ? ['short', 'crew', 'messy', 'long'] : ['ponytail', 'bob', 'long', 'braid'];
+      return styles.flatMap((h) => [
+        { label: `${h} front`, spec: spec(sex, 'default', 'idle', { hairStyle: h, phase: 0 }), yaw: 0 },
+        { label: `${h} 3/4`, spec: spec(sex, 'default', 'idle', { hairStyle: h, phase: 0 }), yaw: Q * 1.5 },
+      ]);
+    }
+    case 'wardrobe': {
+      const sex = (params.get('sex') || 'male') as 'male' | 'female';
+      const outfits = [
+        'top:polo,bottom:cargo_pants,shoes:hiking_boots', 'top:tank_top,bottom:shorts,shoes:sneakers', 'top:sweater,bottom:sweatpants,shoes:sneakers,hat:fedora',
+        'full:sundress,shoes:flats', 'full:ball_gown,shoes:flats', 'full:swimsuit', 'full:tuxedo,shoes:hiking_boots', 'full:jumpsuit,shoes:sneakers',
+      ];
+      return outfits.map((o) => ({ label: o.split(',')[0]!.split(':')[1]!, spec: spec(sex, 'default', 'idle', { outfitSpec: o, phase: 0 }), yaw: Q * 0.5 }));
+    }
+    case 'pose':
+      // one clip at one phase, three views of the male plus the female side view (debugging authored poses)
+      return [
+        { label: 'M front', spec: spec('male', 'default', 'idle', { phase: phaseParam ?? 0 }), yaw: 0 },
+        { label: 'M side', spec: spec('male', 'default', 'idle', { phase: phaseParam ?? 0 }), yaw: Math.PI / 2 },
+        { label: 'M back', spec: spec('male', 'default', 'idle', { phase: phaseParam ?? 0 }), yaw: Math.PI },
+        { label: 'F side', spec: spec('female', 'default', 'idle', { phase: phaseParam ?? 0 }), yaw: Math.PI / 2 },
       ];
     case 'cast':
       return [
@@ -77,6 +121,8 @@ async function loadCandidate(): Promise<Candidate> {
       return (await import('./candidates/b/index.ts')).candidateB;
     case 'c':
       return (await import('./candidates/c/index.ts')).candidateC;
+    case 'p':
+      return (await import('./candidates/p/index.ts')).candidateP;
     default:
       throw new Error(`unknown candidate ${candidateId}`);
   }
@@ -128,7 +174,7 @@ async function main(): Promise<void> {
   const list = slots();
   const figures: Figure[] = [];
   const n = list.length;
-  const spacing = 1.15;
+  const spacing = shot === 'anim' ? 1.35 : shot === 'skins' || shot === 'wardrobe' || shot === 'hair' ? 0.8 : 1.15;
   const x0 = -((n - 1) * spacing) / 2;
   let maxH = 0;
   let tris = 0;
@@ -169,7 +215,7 @@ async function main(): Promise<void> {
       const info = renderer.info.render;
       const stats = { candidate: candidateId, shot, figures: list.map((s) => s.label), triangles: tris, drawCalls: info.calls, height: figures.map((f) => +f.height.toFixed(2)) };
       win.__labStats = stats;
-      caption.textContent = `${candidate.label} · ${shot} · ${list.map((s) => s.label).join(' | ')} · tris/figure ≈ ${Math.round(tris / n)} · heights ${stats.height.join('/')} m\n${candidate.notes}`;
+      caption.textContent = `${candidate.label} · ${shot}${clipParam ? ' · clip ' + clipParam + (libParam ? ' (' + libParam + ' lib)' : '') : ''} · ${list.map((s) => s.label).join(' | ')} · tris/figure ≈ ${Math.round(tris / n)} · heights ${stats.height.join('/')} m\n${candidate.notes}`;
       win.__labReady = true;
     }
     requestAnimationFrame(render);

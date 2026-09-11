@@ -1,0 +1,1287 @@
+{
+  "$comment": "Hand-authored clips (plan §4.4) baked by blender/poses.py through retarget.py. Frame: +x = character's LEFT, +y up, +z forward (three.js at yaw 0). Right-handed angler: the rod lies along hand_r's local +X (thumb side), palm normal is local +Z (faces the body at rest). Aim vectors are bone directions (shoulder→elbow, elbow→wrist, wrist→fingers).",
+  "poses": {
+    "hold": {
+      "$comment": "Waiting for a bite: rod forward-up ~25°, right hand in front of the hip, left hand cupping the reel foot.",
+      "upperArmR": {
+        "aim": [
+          -0.28,
+          -0.92,
+          0.28
+        ]
+      },
+      "lowerArmR": {
+        "aim": [
+          0.28,
+          0.02,
+          0.96
+        ]
+      },
+      "handR": {
+        "orient": {
+          "axis": [
+            1,
+            0,
+            0
+          ],
+          "dir": [
+            0.06,
+            0.42,
+            0.9
+          ],
+          "up_axis": [
+            0,
+            0,
+            1
+          ],
+          "up": [
+            1,
+            0,
+            0
+          ]
+        }
+      },
+      "upperArmL": {
+        "aim": [
+          0.12,
+          -0.9,
+          0.42
+        ]
+      },
+      "lowerArmL": {
+        "aim": [
+          -0.72,
+          -0.1,
+          0.68
+        ]
+      },
+      "handL": {
+        "orient": {
+          "axis": [
+            0,
+            1,
+            0
+          ],
+          "dir": [
+            -0.8,
+            -0.15,
+            0.58
+          ],
+          "up_axis": [
+            0,
+            0,
+            1
+          ],
+          "up": [
+            0,
+            -1,
+            0
+          ]
+        }
+      },
+      "spine1": {
+        "twist": [
+          [
+            0,
+            1,
+            0
+          ],
+          6
+        ]
+      },
+      "spine3": {
+        "twist": [
+          [
+            1,
+            0,
+            0
+          ],
+          3
+        ]
+      },
+      "head": {
+        "twist": [
+          [
+            0,
+            1,
+            0
+          ],
+          -6
+        ]
+      },
+      "hips": {
+        "offset": [
+          0,
+          -0.01,
+          0
+        ]
+      },
+      "upperLegL": {
+        "aim": [
+          0.08,
+          -1,
+          0.03
+        ]
+      },
+      "upperLegR": {
+        "aim": [
+          -0.1,
+          -1,
+          -0.02
+        ]
+      }
+    },
+    "hold_b": {
+      "$comment": "Idle variation: a little sway and the rod tip drifting.",
+      "extends": "hold",
+      "handR": {
+        "orient": {
+          "axis": [
+            1,
+            0,
+            0
+          ],
+          "dir": [
+            0.02,
+            0.36,
+            0.93
+          ],
+          "up_axis": [
+            0,
+            0,
+            1
+          ],
+          "up": [
+            1,
+            0,
+            0
+          ]
+        }
+      },
+      "spine1": {
+        "twist": [
+          [
+            0,
+            1,
+            0
+          ],
+          3
+        ]
+      },
+      "spine2": {
+        "twist": [
+          [
+            0,
+            0,
+            1
+          ],
+          -1.5
+        ]
+      },
+      "head": {
+        "twist": [
+          [
+            0,
+            1,
+            0
+          ],
+          4
+        ]
+      },
+      "hips": {
+        "offset": [
+          0.01,
+          -0.015,
+          0
+        ]
+      }
+    },
+    "charge_half": {
+      "$comment": "Rod coming up past the shoulder.",
+      "extends": "hold",
+      "upperArmR": {
+        "aim": [
+          -0.45,
+          0.12,
+          0.88
+        ]
+      },
+      "lowerArmR": {
+        "aim": [
+          0.12,
+          0.86,
+          -0.15
+        ]
+      },
+      "handR": {
+        "orient": {
+          "axis": [
+            1,
+            0,
+            0
+          ],
+          "dir": [
+            -0.1,
+            0.88,
+            -0.45
+          ],
+          "up_axis": [
+            0,
+            0,
+            1
+          ],
+          "up": [
+            1,
+            0,
+            0
+          ]
+        }
+      },
+      "upperArmL": {
+        "aim": [
+          0.3,
+          -0.8,
+          0.52
+        ]
+      },
+      "lowerArmL": {
+        "aim": [
+          -0.2,
+          -0.45,
+          0.87
+        ]
+      },
+      "handL": {
+        "orient": {
+          "axis": [
+            0,
+            1,
+            0
+          ],
+          "dir": [
+            -0.2,
+            -0.45,
+            0.87
+          ],
+          "up_axis": [
+            0,
+            0,
+            1
+          ],
+          "up": [
+            -1,
+            0,
+            0
+          ]
+        }
+      },
+      "spine1": {
+        "twist": [
+          [
+            0,
+            1,
+            0
+          ],
+          -10
+        ]
+      },
+      "spine3": {
+        "twist": [
+          [
+            1,
+            0,
+            0
+          ],
+          -3
+        ]
+      },
+      "head": {
+        "twist": [
+          [
+            0,
+            1,
+            0
+          ],
+          12
+        ]
+      }
+    },
+    "loaded": {
+      "$comment": "Top of the back-cast: elbow up, forearm back over the shoulder, rod tip behind, weight back, eyes on the water.",
+      "extends": "hold",
+      "upperArmR": {
+        "aim": [
+          -0.55,
+          0.35,
+          0.75
+        ]
+      },
+      "lowerArmR": {
+        "aim": [
+          0.1,
+          0.75,
+          -0.65
+        ]
+      },
+      "handR": {
+        "orient": {
+          "axis": [
+            1,
+            0,
+            0
+          ],
+          "dir": [
+            -0.12,
+            0.5,
+            -0.86
+          ],
+          "up_axis": [
+            0,
+            0,
+            1
+          ],
+          "up": [
+            1,
+            0,
+            0
+          ]
+        }
+      },
+      "upperArmL": {
+        "aim": [
+          0.32,
+          -0.72,
+          0.62
+        ]
+      },
+      "lowerArmL": {
+        "aim": [
+          -0.12,
+          -0.3,
+          0.95
+        ]
+      },
+      "handL": {
+        "orient": {
+          "axis": [
+            0,
+            1,
+            0
+          ],
+          "dir": [
+            -0.12,
+            -0.25,
+            0.96
+          ],
+          "up_axis": [
+            0,
+            0,
+            1
+          ],
+          "up": [
+            -1,
+            0,
+            0
+          ]
+        }
+      },
+      "spine1": {
+        "twist": [
+          [
+            0,
+            1,
+            0
+          ],
+          -18
+        ]
+      },
+      "spine2": {
+        "twist": [
+          [
+            1,
+            0,
+            0
+          ],
+          -6
+        ]
+      },
+      "spine3": {
+        "twist": [
+          [
+            1,
+            0,
+            0
+          ],
+          -4
+        ]
+      },
+      "head": {
+        "twist": [
+          [
+            0,
+            1,
+            0
+          ],
+          22
+        ]
+      },
+      "neck": {
+        "twist": [
+          [
+            1,
+            0,
+            0
+          ],
+          -6
+        ]
+      },
+      "hips": {
+        "offset": [
+          0.02,
+          -0.03,
+          -0.06
+        ]
+      },
+      "upperLegL": {
+        "aim": [
+          0.12,
+          -0.98,
+          0.16
+        ]
+      },
+      "lowerLegL": {
+        "aim": [
+          0.05,
+          -0.98,
+          -0.1
+        ]
+      },
+      "upperLegR": {
+        "aim": [
+          -0.12,
+          -0.96,
+          -0.25
+        ]
+      },
+      "lowerLegR": {
+        "aim": [
+          -0.05,
+          -0.92,
+          0.38
+        ]
+      }
+    },
+    "flick": {
+      "$comment": "Rod passing vertical at full speed.",
+      "extends": "loaded",
+      "upperArmR": {
+        "aim": [
+          -0.4,
+          0.62,
+          0.68
+        ]
+      },
+      "lowerArmR": {
+        "aim": [
+          0.1,
+          0.72,
+          0.68
+        ]
+      },
+      "handR": {
+        "orient": {
+          "axis": [
+            1,
+            0,
+            0
+          ],
+          "dir": [
+            -0.05,
+            0.85,
+            0.52
+          ],
+          "up_axis": [
+            0,
+            0,
+            1
+          ],
+          "up": [
+            1,
+            0,
+            0
+          ]
+        }
+      },
+      "spine1": {
+        "twist": [
+          [
+            0,
+            1,
+            0
+          ],
+          -4
+        ]
+      },
+      "spine2": {
+        "twist": [
+          [
+            1,
+            0,
+            0
+          ],
+          2
+        ]
+      },
+      "spine3": {
+        "twist": [
+          [
+            1,
+            0,
+            0
+          ],
+          2
+        ]
+      },
+      "head": {
+        "twist": [
+          [
+            0,
+            1,
+            0
+          ],
+          6
+        ]
+      },
+      "neck": {
+        "twist": [
+          [
+            1,
+            0,
+            0
+          ],
+          0
+        ]
+      },
+      "hips": {
+        "offset": [
+          0,
+          -0.03,
+          -0.02
+        ]
+      }
+    },
+    "follow": {
+      "$comment": "Follow-through: arm extended toward the water, rod at ~35°, weight forward.",
+      "extends": "flick",
+      "upperArmR": {
+        "aim": [
+          -0.3,
+          -0.15,
+          0.94
+        ]
+      },
+      "lowerArmR": {
+        "aim": [
+          0.05,
+          0.12,
+          0.99
+        ]
+      },
+      "handR": {
+        "orient": {
+          "axis": [
+            1,
+            0,
+            0
+          ],
+          "dir": [
+            0.02,
+            0.55,
+            0.83
+          ],
+          "up_axis": [
+            0,
+            0,
+            1
+          ],
+          "up": [
+            1,
+            0,
+            0
+          ]
+        }
+      },
+      "upperArmL": {
+        "aim": [
+          0.3,
+          -0.85,
+          0.42
+        ]
+      },
+      "lowerArmL": {
+        "aim": [
+          -0.3,
+          -0.45,
+          0.84
+        ]
+      },
+      "handL": {
+        "orient": {
+          "axis": [
+            0,
+            1,
+            0
+          ],
+          "dir": [
+            -0.3,
+            -0.45,
+            0.84
+          ],
+          "up_axis": [
+            0,
+            0,
+            1
+          ],
+          "up": [
+            -1,
+            0,
+            0
+          ]
+        }
+      },
+      "spine1": {
+        "twist": [
+          [
+            0,
+            1,
+            0
+          ],
+          8
+        ]
+      },
+      "spine2": {
+        "twist": [
+          [
+            1,
+            0,
+            0
+          ],
+          7
+        ]
+      },
+      "spine3": {
+        "twist": [
+          [
+            1,
+            0,
+            0
+          ],
+          4
+        ]
+      },
+      "head": {
+        "twist": [
+          [
+            0,
+            1,
+            0
+          ],
+          -6
+        ]
+      },
+      "hips": {
+        "offset": [
+          0.01,
+          -0.04,
+          0.05
+        ]
+      },
+      "upperLegL": {
+        "aim": [
+          0.1,
+          -0.97,
+          0.22
+        ]
+      },
+      "lowerLegL": {
+        "aim": [
+          0.05,
+          -0.99,
+          0.05
+        ]
+      },
+      "upperLegR": {
+        "aim": [
+          -0.12,
+          -0.97,
+          -0.2
+        ]
+      },
+      "lowerLegR": {
+        "aim": [
+          -0.05,
+          -0.9,
+          0.42
+        ]
+      }
+    },
+    "reel_a": {
+      "$comment": "Reeling: rod tip up a little, body leaning back, left hand at the crank (4 crank positions).",
+      "extends": "hold",
+      "handR": {
+        "orient": {
+          "axis": [
+            1,
+            0,
+            0
+          ],
+          "dir": [
+            0.05,
+            0.5,
+            0.86
+          ],
+          "up_axis": [
+            0,
+            0,
+            1
+          ],
+          "up": [
+            1,
+            0,
+            0
+          ]
+        }
+      },
+      "spine2": {
+        "twist": [
+          [
+            1,
+            0,
+            0
+          ],
+          -4
+        ]
+      },
+      "upperArmL": {
+        "aim": [
+          0.1,
+          -0.86,
+          0.5
+        ]
+      },
+      "lowerArmL": {
+        "aim": [
+          -0.72,
+          -0.2,
+          0.66
+        ]
+      },
+      "handL": {
+        "orient": {
+          "axis": [
+            0,
+            1,
+            0
+          ],
+          "dir": [
+            -0.78,
+            -0.3,
+            0.55
+          ],
+          "up_axis": [
+            0,
+            0,
+            1
+          ],
+          "up": [
+            0,
+            -1,
+            0
+          ]
+        }
+      },
+      "hips": {
+        "offset": [
+          0,
+          -0.015,
+          -0.02
+        ]
+      }
+    },
+    "reel_b": {
+      "extends": "reel_a",
+      "upperArmL": {
+        "aim": [
+          0.13,
+          -0.84,
+          0.53
+        ]
+      },
+      "lowerArmL": {
+        "aim": [
+          -0.74,
+          -0.05,
+          0.67
+        ]
+      },
+      "handL": {
+        "orient": {
+          "axis": [
+            0,
+            1,
+            0
+          ],
+          "dir": [
+            -0.8,
+            -0.1,
+            0.6
+          ],
+          "up_axis": [
+            0,
+            0,
+            1
+          ],
+          "up": [
+            0,
+            -1,
+            0
+          ]
+        }
+      },
+      "handR": {
+        "orient": {
+          "axis": [
+            1,
+            0,
+            0
+          ],
+          "dir": [
+            0.05,
+            0.46,
+            0.89
+          ],
+          "up_axis": [
+            0,
+            0,
+            1
+          ],
+          "up": [
+            1,
+            0,
+            0
+          ]
+        }
+      }
+    },
+    "reel_c": {
+      "extends": "reel_a",
+      "upperArmL": {
+        "aim": [
+          0.1,
+          -0.88,
+          0.47
+        ]
+      },
+      "lowerArmL": {
+        "aim": [
+          -0.7,
+          0.05,
+          0.71
+        ]
+      },
+      "handL": {
+        "orient": {
+          "axis": [
+            0,
+            1,
+            0
+          ],
+          "dir": [
+            -0.78,
+            0.05,
+            0.62
+          ],
+          "up_axis": [
+            0,
+            0,
+            1
+          ],
+          "up": [
+            0,
+            -1,
+            0
+          ]
+        }
+      },
+      "handR": {
+        "orient": {
+          "axis": [
+            1,
+            0,
+            0
+          ],
+          "dir": [
+            0.05,
+            0.52,
+            0.85
+          ],
+          "up_axis": [
+            0,
+            0,
+            1
+          ],
+          "up": [
+            1,
+            0,
+            0
+          ]
+        }
+      }
+    },
+    "reel_d": {
+      "extends": "reel_a",
+      "upperArmL": {
+        "aim": [
+          0.07,
+          -0.9,
+          0.43
+        ]
+      },
+      "lowerArmL": {
+        "aim": [
+          -0.68,
+          -0.12,
+          0.72
+        ]
+      },
+      "handL": {
+        "orient": {
+          "axis": [
+            0,
+            1,
+            0
+          ],
+          "dir": [
+            -0.76,
+            -0.2,
+            0.62
+          ],
+          "up_axis": [
+            0,
+            0,
+            1
+          ],
+          "up": [
+            0,
+            -1,
+            0
+          ]
+        }
+      },
+      "handR": {
+        "orient": {
+          "axis": [
+            1,
+            0,
+            0
+          ],
+          "dir": [
+            0.05,
+            0.48,
+            0.88
+          ],
+          "up_axis": [
+            0,
+            0,
+            1
+          ],
+          "up": [
+            1,
+            0,
+            0
+          ]
+        }
+      }
+    },
+    "hands_up": {
+      "$comment": "Innocent NPC under threat (§12.2): both hands up beside the head.",
+      "upperArmR": {
+        "aim": [
+          -0.75,
+          0.25,
+          0.25
+        ]
+      },
+      "lowerArmR": {
+        "aim": [
+          0.1,
+          0.98,
+          -0.1
+        ]
+      },
+      "handR": {
+        "aim": [
+          0.05,
+          0.98,
+          -0.15
+        ]
+      },
+      "upperArmL": {
+        "aim": [
+          0.75,
+          0.25,
+          0.25
+        ]
+      },
+      "lowerArmL": {
+        "aim": [
+          -0.1,
+          0.98,
+          -0.1
+        ]
+      },
+      "handL": {
+        "aim": [
+          -0.05,
+          0.98,
+          -0.15
+        ]
+      },
+      "spine2": {
+        "twist": [
+          [
+            1,
+            0,
+            0
+          ],
+          -4
+        ]
+      },
+      "head": {
+        "twist": [
+          [
+            1,
+            0,
+            0
+          ],
+          6
+        ]
+      },
+      "hips": {
+        "offset": [
+          0,
+          -0.02,
+          -0.03
+        ]
+      }
+    }
+  },
+  "clips": [
+    {
+      "name": "fish_idle",
+      "loop": true,
+      "duration": 4.0,
+      "fingers": {
+        "r": [
+          "knife_idle",
+          0
+        ],
+        "l": [
+          "idle",
+          0
+        ]
+      },
+      "keys": [
+        {
+          "t": 0.0,
+          "pose": "hold"
+        },
+        {
+          "t": 2.0,
+          "pose": "hold_b"
+        },
+        {
+          "t": 4.0,
+          "pose": "hold"
+        }
+      ]
+    },
+    {
+      "name": "cast_charge",
+      "fingers": {
+        "r": [
+          "knife_idle",
+          0
+        ],
+        "l": [
+          "idle",
+          0
+        ]
+      },
+      "keys": [
+        {
+          "t": 0.0,
+          "pose": "hold"
+        },
+        {
+          "t": 0.3,
+          "pose": "charge_half"
+        },
+        {
+          "t": 0.6,
+          "pose": "loaded",
+          "ease": "out"
+        }
+      ]
+    },
+    {
+      "name": "cast_release",
+      "fingers": {
+        "r": [
+          "knife_idle",
+          0
+        ],
+        "l": [
+          "idle",
+          0
+        ]
+      },
+      "keys": [
+        {
+          "t": 0.0,
+          "pose": "loaded",
+          "ease": "in"
+        },
+        {
+          "t": 0.13,
+          "pose": "flick",
+          "ease": "linear"
+        },
+        {
+          "t": 0.27,
+          "pose": "follow",
+          "ease": "out"
+        },
+        {
+          "t": 0.75,
+          "pose": "hold"
+        }
+      ]
+    },
+    {
+      "name": "cast",
+      "fingers": {
+        "r": [
+          "knife_idle",
+          0
+        ],
+        "l": [
+          "idle",
+          0
+        ]
+      },
+      "$comment": "Lab preview: charge + release end to end.",
+      "keys": [
+        {
+          "t": 0.0,
+          "pose": "hold"
+        },
+        {
+          "t": 0.3,
+          "pose": "charge_half"
+        },
+        {
+          "t": 0.6,
+          "pose": "loaded",
+          "ease": "out"
+        },
+        {
+          "t": 0.9,
+          "pose": "loaded",
+          "ease": "in"
+        },
+        {
+          "t": 1.03,
+          "pose": "flick",
+          "ease": "linear"
+        },
+        {
+          "t": 1.17,
+          "pose": "follow",
+          "ease": "out"
+        },
+        {
+          "t": 1.65,
+          "pose": "hold"
+        }
+      ]
+    },
+    {
+      "name": "reel",
+      "loop": true,
+      "duration": 0.8,
+      "fingers": {
+        "r": [
+          "knife_idle",
+          0
+        ],
+        "l": [
+          "knife_idle",
+          0
+        ]
+      },
+      "keys": [
+        {
+          "t": 0.0,
+          "pose": "reel_a",
+          "ease": "linear"
+        },
+        {
+          "t": 0.2,
+          "pose": "reel_b",
+          "ease": "linear"
+        },
+        {
+          "t": 0.4,
+          "pose": "reel_c",
+          "ease": "linear"
+        },
+        {
+          "t": 0.6,
+          "pose": "reel_d",
+          "ease": "linear"
+        },
+        {
+          "t": 0.8,
+          "pose": "reel_a",
+          "ease": "linear"
+        }
+      ]
+    },
+    {
+      "name": "hands_up",
+      "loop": true,
+      "duration": 2.0,
+      "fingers": {
+        "r": [
+          "idle",
+          0
+        ],
+        "l": [
+          "idle",
+          0
+        ]
+      },
+      "keys": [
+        {
+          "t": 0.0,
+          "pose": "hands_up"
+        },
+        {
+          "t": 2.0,
+          "pose": "hands_up"
+        }
+      ]
+    }
+  ]
+}

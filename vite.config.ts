@@ -23,6 +23,7 @@ export default defineConfig({
         lab: resolve(__dirname, 'lab/index.html'),
         characters: resolve(__dirname, 'lab/characters.html'),
         vignette: resolve(__dirname, 'lab/vignette.html'),
+        map: resolve(__dirname, 'lab/map.html'),
       },
     },
   },

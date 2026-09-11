@@ -1,0 +1,434 @@
+{
+  "$comment": "M1 player bodies (plan §5, §8.2, §1 #26). One GLB per body with every garment fitted (anyone can wear anything), four hairstyles and the underwear base layer as separate skinned meshes; the runtime toggles them (src/character/character.ts). Garment `id`s are the clothing item ids in src/data/items.ts. `tint`: keep the pack texture and let the runtime multiply a colour; `color`: flat colour; `pattern`: generated texture. Extra skins export their diffuse textures for the creator's skin swatches.",
+  "figures": [
+    {
+      "name": "player_male",
+      "macro": {
+        "gender": 1.0,
+        "age": 0.5,
+        "muscle": 0.62,
+        "weight": 0.5,
+        "proportions": 0.72,
+        "height": 0.56,
+        "race": {
+          "caucasian": 1.0,
+          "african": 0.0,
+          "asian": 0.0
+        }
+      },
+      "rig": "game_engine",
+      "skin": "young_caucasian_male",
+      "skins_extra": {
+        "asian": "young_asian_male",
+        "african": "young_african_male"
+      },
+      "eyes": "low-poly",
+      "eyebrows": "eyebrow001",
+      "eyelashes": "eyelashes01",
+      "hairs": [
+        {
+          "id": "short",
+          "asset": "short02"
+        },
+        {
+          "id": "crew",
+          "asset": "short01"
+        },
+        {
+          "id": "messy",
+          "asset": "cortu_short_messy_hair"
+        },
+        {
+          "id": "long",
+          "asset": "long01"
+        }
+      ],
+      "clothes": [
+        {
+          "id": "boxers",
+          "asset": "cortu_jeans_shorts",
+          "pattern": "polka",
+          "layer": "underwear",
+          "slot": "bottom"
+        },
+        {
+          "id": "tshirt",
+          "asset": "elvs_crude_t-shirt_male",
+          "color": [
+            0.85,
+            0.85,
+            0.85,
+            1.0
+          ],
+          "slot": "top"
+        },
+        {
+          "id": "polo",
+          "asset": "namuhekam_male_polo_shirt",
+          "tint": true,
+          "slot": "top"
+        },
+        {
+          "id": "tank_top",
+          "asset": "toigo_keyhole_tank_top",
+          "color": [
+            0.85,
+            0.85,
+            0.85,
+            1.0
+          ],
+          "slot": "top"
+        },
+        {
+          "id": "sweater",
+          "asset": "toigo_fisherman_sweater",
+          "tint": true,
+          "slot": "top"
+        },
+        {
+          "id": "pants",
+          "asset": "toigo_wool_pants",
+          "color": [
+            0.85,
+            0.85,
+            0.85,
+            1.0
+          ],
+          "slot": "bottom"
+        },
+        {
+          "id": "cargo_pants",
+          "asset": "cortu_cargo_pants",
+          "tint": true,
+          "slot": "bottom"
+        },
+        {
+          "id": "shorts",
+          "asset": "cortu_jeans_shorts",
+          "tint": true,
+          "slot": "bottom"
+        },
+        {
+          "id": "sweatpants",
+          "asset": "toigo_harem_pants",
+          "color": [
+            0.85,
+            0.85,
+            0.85,
+            1.0
+          ],
+          "slot": "bottom"
+        },
+        {
+          "id": "short_dress",
+          "asset": "toigo_shift_dress",
+          "color": [
+            0.85,
+            0.85,
+            0.85,
+            1.0
+          ],
+          "slot": "full"
+        },
+        {
+          "id": "sundress",
+          "asset": "toigo_camisole_dress_with_full_skirt",
+          "color": [
+            0.85,
+            0.85,
+            0.85,
+            1.0
+          ],
+          "slot": "full"
+        },
+        {
+          "id": "ball_gown",
+          "asset": "aethelraed_flapper_dress",
+          "slot": "full",
+          "color": [
+            0.85,
+            0.85,
+            0.85,
+            1.0
+          ]
+        },
+        {
+          "id": "swimsuit",
+          "asset": "female_sportsuit01",
+          "tint": true,
+          "slot": "full"
+        },
+        {
+          "id": "tuxedo",
+          "asset": "male_elegantsuit01",
+          "tint": true,
+          "slot": "full"
+        },
+        {
+          "id": "jumpsuit",
+          "asset": "male_worksuit01",
+          "color": [
+            0.85,
+            0.85,
+            0.85,
+            1.0
+          ],
+          "slot": "full"
+        },
+        {
+          "id": "sneakers",
+          "asset": "shoes02",
+          "tint": true,
+          "slot": "shoes"
+        },
+        {
+          "id": "hiking_boots",
+          "asset": "culturalibre_male_boots",
+          "tint": true,
+          "slot": "shoes"
+        },
+        {
+          "id": "flats",
+          "asset": "toigo_ballet_flats",
+          "tint": true,
+          "slot": "shoes"
+        },
+        {
+          "id": "fedora",
+          "asset": "fedora01",
+          "tint": true,
+          "slot": "hat"
+        }
+      ],
+      "texture_sizes": {
+        "skin": 2048,
+        "hair": 1024,
+        "clothes": 1024
+      }
+    },
+    {
+      "name": "player_female",
+      "macro": {
+        "gender": 0.0,
+        "age": 0.5,
+        "muscle": 0.55,
+        "weight": 0.45,
+        "proportions": 0.42,
+        "height": 0.55,
+        "cupsize": 0.6,
+        "firmness": 0.7,
+        "race": {
+          "caucasian": 1.0,
+          "african": 0.0,
+          "asian": 0.0
+        }
+      },
+      "rig": "game_engine",
+      "skin": "young_caucasian_female",
+      "skins_extra": {
+        "asian": "young_asian_female",
+        "african": "young_african_female"
+      },
+      "eyes": "low-poly",
+      "eyebrows": "eyebrow002",
+      "eyelashes": "eyelashes02",
+      "hairs": [
+        {
+          "id": "ponytail",
+          "asset": "ponytail01"
+        },
+        {
+          "id": "bob",
+          "asset": "bob01"
+        },
+        {
+          "id": "long",
+          "asset": "long01"
+        },
+        {
+          "id": "braid",
+          "asset": "braid01"
+        }
+      ],
+      "clothes": [
+        {
+          "id": "bra",
+          "asset": "wolgade_female_top_01",
+          "color": [
+            0.95,
+            0.95,
+            0.95,
+            1.0
+          ],
+          "layer": "underwear",
+          "slot": "top"
+        },
+        {
+          "id": "boyshorts",
+          "asset": "cortu_jeans_shorts",
+          "color": [
+            0.95,
+            0.95,
+            0.95,
+            1.0
+          ],
+          "layer": "underwear",
+          "slot": "bottom"
+        },
+        {
+          "id": "tshirt",
+          "asset": "elvs_crude_t-shirt_male",
+          "color": [
+            0.85,
+            0.85,
+            0.85,
+            1.0
+          ],
+          "slot": "top"
+        },
+        {
+          "id": "polo",
+          "asset": "namuhekam_male_polo_shirt",
+          "tint": true,
+          "slot": "top"
+        },
+        {
+          "id": "tank_top",
+          "asset": "toigo_keyhole_tank_top",
+          "color": [
+            0.85,
+            0.85,
+            0.85,
+            1.0
+          ],
+          "slot": "top"
+        },
+        {
+          "id": "sweater",
+          "asset": "toigo_fisherman_sweater",
+          "tint": true,
+          "slot": "top"
+        },
+        {
+          "id": "pants",
+          "asset": "toigo_wool_pants",
+          "color": [
+            0.85,
+            0.85,
+            0.85,
+            1.0
+          ],
+          "slot": "bottom"
+        },
+        {
+          "id": "cargo_pants",
+          "asset": "cortu_cargo_pants",
+          "tint": true,
+          "slot": "bottom"
+        },
+        {
+          "id": "shorts",
+          "asset": "cortu_jeans_shorts",
+          "tint": true,
+          "slot": "bottom"
+        },
+        {
+          "id": "sweatpants",
+          "asset": "toigo_harem_pants",
+          "color": [
+            0.85,
+            0.85,
+            0.85,
+            1.0
+          ],
+          "slot": "bottom"
+        },
+        {
+          "id": "short_dress",
+          "asset": "toigo_shift_dress",
+          "color": [
+            0.85,
+            0.85,
+            0.85,
+            1.0
+          ],
+          "slot": "full"
+        },
+        {
+          "id": "sundress",
+          "asset": "toigo_camisole_dress_with_full_skirt",
+          "color": [
+            0.85,
+            0.85,
+            0.85,
+            1.0
+          ],
+          "slot": "full"
+        },
+        {
+          "id": "ball_gown",
+          "asset": "aethelraed_flapper_dress",
+          "slot": "full",
+          "color": [
+            0.85,
+            0.85,
+            0.85,
+            1.0
+          ]
+        },
+        {
+          "id": "swimsuit",
+          "asset": "female_sportsuit01",
+          "tint": true,
+          "slot": "full"
+        },
+        {
+          "id": "tuxedo",
+          "asset": "male_elegantsuit01",
+          "tint": true,
+          "slot": "full"
+        },
+        {
+          "id": "jumpsuit",
+          "asset": "male_worksuit01",
+          "color": [
+            0.85,
+            0.85,
+            0.85,
+            1.0
+          ],
+          "slot": "full"
+        },
+        {
+          "id": "sneakers",
+          "asset": "shoes02",
+          "tint": true,
+          "slot": "shoes"
+        },
+        {
+          "id": "hiking_boots",
+          "asset": "culturalibre_male_boots",
+          "tint": true,
+          "slot": "shoes"
+        },
+        {
+          "id": "flats",
+          "asset": "toigo_ballet_flats",
+          "tint": true,
+          "slot": "shoes"
+        },
+        {
+          "id": "fedora",
+          "asset": "fedora01",
+          "tint": true,
+          "slot": "hat"
+        }
+      ],
+      "texture_sizes": {
+        "skin": 2048,
+        "hair": 1024,
+        "clothes": 1024
+      }
+    }
+  ]
+}

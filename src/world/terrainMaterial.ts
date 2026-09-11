@@ -14,6 +14,8 @@ export interface TerrainLayerTextures {
   /** Fallback colour when no colour map is present. */
   fallback: THREE.Color;
   roughness: number;
+  /** Multiplied into the colour map (e.g. to green up a dry grass photo). */
+  tint?: THREE.Color;
 }
 
 export interface TerrainMaterialOptions {
@@ -64,6 +66,10 @@ export function createTerrainMaterial(opts: TerrainMaterialOptions): THREE.MeshS
     uFallback1: { value: L[1].fallback },
     uFallback2: { value: L[2].fallback },
     uFallback3: { value: L[3].fallback },
+    uTint0: { value: L[0].tint ?? new THREE.Color(1, 1, 1) },
+    uTint1: { value: L[1].tint ?? new THREE.Color(1, 1, 1) },
+    uTint2: { value: L[2].tint ?? new THREE.Color(1, 1, 1) },
+    uTint3: { value: L[3].tint ?? new THREE.Color(1, 1, 1) },
     uDeadGrass: { value: DEAD_GRASS },
     uColor0: { value: prepare(L[0].color, true) },
     uColor1: { value: prepare(L[1].color, true) },
@@ -95,6 +101,7 @@ uniform sampler2D uArm0, uArm1, uArm2, uArm3;
 uniform float uSize;
 uniform vec4 uTile, uHasColor, uHasNormal, uHasArm, uRough;
 uniform vec3 uFallback0, uFallback1, uFallback2, uFallback3, uDeadGrass;
+uniform vec3 uTint0, uTint1, uTint2, uTint3;
 vec4 terrainWeights;
 float terrainTrash;
 vec3 terrainArm;
@@ -124,16 +131,33 @@ vec3 layerArm(sampler2D tex, float has, float rough, vec2 uv) {
   terrainWeights = pow(terrainWeights, vec4(1.6));
   terrainWeights /= max(0.0001, dot(terrainWeights, vec4(1.0)));
   vec2 w0 = vTerrainPos.xz / uTile.x, w1 = vTerrainPos.xz / uTile.y, w2 = vTerrainPos.xz / uTile.z, w3 = vTerrainPos.xz / uTile.w;
-  vec3 c0 = layerColor(uColor0, uHasColor.x, uFallback0, w0);
-  vec3 c1 = layerColor(uColor1, uHasColor.y, uFallback1, w1);
-  vec3 c2 = layerColor(uColor2, uHasColor.z, uFallback2, w2);
-  vec3 c3 = layerColor(uColor3, uHasColor.w, uFallback3, w3);
-  // trash: living grass fades to dead straw, forest floor dries out a little
-  float lum0 = dot(c0, vec3(0.299, 0.587, 0.114));
-  c0 = mix(c0, uDeadGrass * (0.6 + 1.2 * lum0), terrainTrash);
-  c1 = mix(c1, c1 * vec3(1.1, 0.95, 0.75), terrainTrash * 0.5);
-  vec3 blended = c0 * terrainWeights.x + c1 * terrainWeights.y + c2 * terrainWeights.z + c3 * terrainWeights.w;
-  terrainArm = layerArm(uArm0, uHasArm.x, uRough.x, w0) * terrainWeights.x + layerArm(uArm1, uHasArm.y, uRough.y, w1) * terrainWeights.y + layerArm(uArm2, uHasArm.z, uRough.z, w2) * terrainWeights.z + layerArm(uArm3, uHasArm.w, uRough.w, w3) * terrainWeights.w;
+  // layers below ~1% weight are skipped: most pixels sample one or two layers instead of four
+  vec3 blended = vec3(0.0);
+  terrainArm = vec3(0.0);
+  if (terrainWeights.x > 0.01) {
+    vec3 c0 = layerColor(uColor0, uHasColor.x, uFallback0, w0) * uTint0;
+    float lum0 = dot(c0, vec3(0.299, 0.587, 0.114));
+    c0 = mix(c0, uDeadGrass * (0.6 + 1.2 * lum0), terrainTrash);
+    blended += c0 * terrainWeights.x;
+    terrainArm += layerArm(uArm0, uHasArm.x, uRough.x, w0) * terrainWeights.x;
+  }
+  if (terrainWeights.y > 0.01) {
+    vec3 c1 = layerColor(uColor1, uHasColor.y, uFallback1, w1) * uTint1;
+    c1 = mix(c1, c1 * vec3(1.1, 0.95, 0.75), terrainTrash * 0.5);
+    blended += c1 * terrainWeights.y;
+    terrainArm += layerArm(uArm1, uHasArm.y, uRough.y, w1) * terrainWeights.y;
+  }
+  if (terrainWeights.z > 0.01) {
+    blended += layerColor(uColor2, uHasColor.z, uFallback2, w2) * uTint2 * terrainWeights.z;
+    terrainArm += layerArm(uArm2, uHasArm.z, uRough.z, w2) * terrainWeights.z;
+  }
+  if (terrainWeights.w > 0.01) {
+    blended += layerColor(uColor3, uHasColor.w, uFallback3, w3) * uTint3 * terrainWeights.w;
+    terrainArm += layerArm(uArm3, uHasArm.w, uRough.w, w3) * terrainWeights.w;
+  }
+  float wsum = max(0.0001, dot(terrainWeights * vec4(greaterThan(terrainWeights, vec4(0.01))), vec4(1.0)));
+  blended /= wsum;
+  terrainArm /= wsum;
   diffuseColor.rgb *= blended;
 }`,
       )
@@ -141,7 +165,12 @@ vec3 layerArm(sampler2D tex, float has, float rough, vec2 uv) {
         '#include <normal_fragment_maps>',
         `{
   vec2 w0 = vTerrainPos.xz / uTile.x, w1 = vTerrainPos.xz / uTile.y, w2 = vTerrainPos.xz / uTile.z, w3 = vTerrainPos.xz / uTile.w;
-  vec3 mapN = layerNormal(uNormal0, uHasNormal.x, w0) * terrainWeights.x + layerNormal(uNormal1, uHasNormal.y, w1) * terrainWeights.y + layerNormal(uNormal2, uHasNormal.z, w2) * terrainWeights.z + layerNormal(uNormal3, uHasNormal.w, w3) * terrainWeights.w;
+  vec3 mapN = vec3(0.0);
+  if (terrainWeights.x > 0.01) mapN += layerNormal(uNormal0, uHasNormal.x, w0) * terrainWeights.x;
+  if (terrainWeights.y > 0.01) mapN += layerNormal(uNormal1, uHasNormal.y, w1) * terrainWeights.y;
+  if (terrainWeights.z > 0.01) mapN += layerNormal(uNormal2, uHasNormal.z, w2) * terrainWeights.z;
+  if (terrainWeights.w > 0.01) mapN += layerNormal(uNormal3, uHasNormal.w, w3) * terrainWeights.w;
+  if (dot(mapN, mapN) < 1e-6) mapN = vec3(0.0, 0.0, 1.0);
   mapN.xy *= 0.8;
   mapN = normalize(mapN);
   // world-space TBN for a heightfield: tangent along +x, bitangent along +z
@@ -172,6 +201,6 @@ vec3 layerArm(sampler2D tex, float has, float rough, vec2 uv) {
 }`,
       );
   };
-  mat.customProgramCacheKey = () => 'terrain-splat-v1';
+  mat.customProgramCacheKey = () => 'terrain-splat-v3';
   return mat;
 }

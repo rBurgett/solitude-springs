@@ -17,13 +17,30 @@ export interface TreeVariant {
   leafMaterial: THREE.Material;
   height: number;
   triangles: number;
+  branchTriangles: number;
+  leafTriangles: number;
   update(t: number): void;
 }
 
-export function makeTreeVariant(spec: TreeVariantSpec): TreeVariant {
+export interface TreeVariantOptions {
+  /** Game budget: two branch levels, fewer sections/segments, fewer but larger leaf cards. */
+  lowPoly?: boolean;
+}
+
+export function makeTreeVariant(spec: TreeVariantSpec, opts: TreeVariantOptions = {}): TreeVariant {
   const tree = new Tree();
   tree.loadPreset(spec.preset);
   tree.options.seed = spec.seed;
+  if (opts.lowPoly) {
+    const o = tree.options;
+    o.branch.levels = Math.min(2, o.branch.levels);
+    o.branch.children[0] = Math.min(o.branch.children[0], 5);
+    o.branch.children[1] = Math.min(o.branch.children[1], 3);
+    o.branch.sections = { 0: 6, 1: 4, 2: 3, 3: 2 };
+    o.branch.segments = { 0: 7, 1: 5, 2: 4, 3: 3 };
+    o.leaves.count = Math.min(Math.max(o.leaves.count, 24), 32);
+    o.leaves.size *= 1.35;
+  }
   tree.generate();
   const branches = tree.branchesMesh.geometry;
   const leaves = tree.leavesMesh.geometry;
@@ -40,6 +57,8 @@ export function makeTreeVariant(spec: TreeVariantSpec): TreeVariant {
     leafMaterial: leafMat,
     height,
     triangles: tri(branches) + tri(leaves),
+    branchTriangles: tri(branches),
+    leafTriangles: tri(leaves),
     update: (t) => tree.update(t),
   };
 }

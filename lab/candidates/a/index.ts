@@ -1,14 +1,15 @@
 // Candidate A — MPFB2 (MakeHuman for Blender) characters generated headlessly by
 // assets-src/characters/blender/generate.py and exported as GLBs with a game_engine rig.
+// Animation comes from the retargeted Quaternius library (assets-src/characters/blender/retarget.py)
+// through src/character/animLibrary.ts + animator.ts; the procedural poser is no longer used here.
 import * as THREE from 'three';
 import type { Candidate, Figure, FigureSpec } from '../types.ts';
 import { loadGltf, cloneScene, prepareCharacterMeshes, findBone } from '../../../src/character/gltf.ts';
-import { resolveBones } from '../../../src/character/boneMap.ts';
-import { Poser, poseCast, poseIdle, poseWalk, poseDebug, CAST_ROD_DIR } from '../../../src/character/poser.ts';
-import { makeRod, placeRod } from '../../../src/character/rod.ts';
+import { loadAnimLibrary, captureRigRest } from '../../../src/character/animLibrary.ts';
+import { Animator } from '../../../src/character/animator.ts';
+import { makeRod } from '../../../src/character/rod.ts';
 
 const BASE = `${import.meta.env.BASE_URL}assets/built/characters/mpfb/`;
-const UAL1 = `${import.meta.env.BASE_URL}assets/fetched/quaternius/ual1/UAL1_Standard.glb`;
 
 function fileFor(spec: FigureSpec): string {
   const outfit = spec.outfit === 'default' ? 'default' : spec.outfit;
@@ -16,30 +17,26 @@ function fileFor(spec: FigureSpec): string {
   return `${spec.sex}_${outfit}`;
 }
 
-/** Try the Quaternius UAL1 clips (same bone naming family); falls back to the procedural poser. */
-async function loadClip(name: string): Promise<THREE.AnimationClip | null> {
-  try {
-    const g = await loadGltf(UAL1);
-    const clip = g.animations.find((c) => c.name === name);
-    if (!clip) return null;
-    // rotation tracks only: the UAL mannequin's bone lengths must not overwrite this rig's
-    return new THREE.AnimationClip(clip.name, clip.duration, clip.tracks.filter((t) => t.name.endsWith('.quaternion') && !/^(root|Root)\./.test(t.name)));
-  } catch {
-    return null;
-  }
+const POSE_CLIP: Record<FigureSpec['pose'], string> = { idle: 'idle', walk: 'walk', cast: 'cast' };
+
+/** Rod grip in hand_r's frame: the blank (rod +Y) along the hand's +X (thumb side), seated in the palm (?rod=x,y,z,rx,ry,rz overrides). */
+function rodGrip(): { pos: THREE.Vector3; euler: THREE.Euler } {
+  const q = new URLSearchParams(location.search).get('rod');
+  const v = q ? q.split(',').map(Number) : [0.0, 0.06, 0.015, 0.0, 0.0, -Math.PI / 2];
+  return { pos: new THREE.Vector3(v[0], v[1], v[2]), euler: new THREE.Euler(v[3] ?? 0, v[4] ?? 0, v[5] ?? 0) };
 }
 
 export const candidateA: Candidate = {
   id: 'a',
   label: 'A — MPFB2 (MakeHuman for Blender)',
   notes:
-    'Bodies, skins, hair and clothes generated headlessly in Blender 5.2 + MPFB 2.0.17 from CC0 packs; fixed male/female presets (shape keys applied at export); game_engine rig (53 bones, Unreal-mannequin names). Underwear uses pack garments recoloured white (no polka-dot texture yet; the male boxers are jean shorts recoloured). Walk and cast are procedural limb-direction poses (rig-agnostic); ?anim=ual tries the Quaternius UAL1 rotation tracks by bone name as a retargeting experiment.',
+    'Bodies, skins, hair and clothes generated headlessly in Blender 5.2 + MPFB 2.0.17 from CC0 packs; fixed male/female presets; game_engine rig (53 bones). Animation: CC0 Quaternius UAL1/UAL2 clips retargeted onto the MPFB rig in Blender (world-space deltas with rest alignment), re-bound per body at runtime.',
   async create(spec: FigureSpec): Promise<Figure> {
     const name = fileFor(spec);
-    const gltf = await loadGltf(`${BASE}${name}.glb`);
+    const libName = spec.lib === 'female' ? 'female_default' : 'male_default';
+    const [gltf, lib] = await Promise.all([loadGltf(`${BASE}${name}.glb`), loadAnimLibrary(`${BASE}${libName}.anims.glb`)]);
     const root = await cloneScene(gltf.scene);
     const { triangles } = prepareCharacterMeshes(root, { envIntensity: 0.8 });
-    // tint hair to the requested colour (hair material is a flat-ish texture)
     root.traverse((o) => {
       const m = o as THREE.Mesh;
       if (m.isMesh && /hair|short|long|pony|bob/i.test(m.name)) {
@@ -49,45 +46,46 @@ export const candidateA: Candidate = {
     });
     const box = new THREE.Box3().setFromObject(root);
     const height = box.max.y - box.min.y;
-    const bones = resolveBones(root);
-    const poser = new Poser(root, bones);
-    const useClips = new URLSearchParams(location.search).get('anim') === 'ual';
-    let mixer: THREE.AnimationMixer | null = null;
-    if (useClips && spec.pose !== 'cast') {
-      const clip = await loadClip(spec.pose === 'walk' ? 'Walk_Loop' : 'Idle_Loop');
-      if (clip) {
-        mixer = new THREE.AnimationMixer(root);
-        mixer.clipAction(clip).play();
+    const rig = captureRigRest(root);
+    const animator = new Animator(root, lib, rig);
+    let clip = spec.clip || POSE_CLIP[spec.pose];
+    if (!animator.has(clip)) {
+      console.warn(`clip ${clip} missing from ${libName}; falling back to idle`);
+      clip = 'idle';
+    }
+    animator.play(clip, { fade: 0 });
+    if (spec.pose === 'cast' || /cast|reel|fish/.test(clip)) {
+      const hand = findBone(root, 'hand_r');
+      if (hand) {
+        const rod = makeRod(2.0);
+        const grip = rodGrip();
+        rod.position.copy(grip.pos);
+        rod.quaternion.setFromEuler(grip.euler);
+        hand.add(rod);
       }
     }
-    let rod: THREE.Group | null = null;
-    if (spec.pose === 'cast') {
-      rod = makeRod(2.0);
-      root.add(rod);
+    if (spec.phase !== undefined) animator.setTime(spec.phase * animator.duration(clip));
+    if (new URLSearchParams(location.search).has('debugHand')) {
+      root.updateMatrixWorld(true);
+      const hand = findBone(root, 'hand_r');
+      if (hand) {
+        const q = hand.getWorldQuaternion(new THREE.Quaternion());
+        const ax = (v: THREE.Vector3): string => v.applyQuaternion(q).toArray().map((n) => n.toFixed(2)).join(',');
+        const restQ = rig.quat.get('hand_r')!.toArray().map((n) => n.toFixed(3)).join(',');
+        const refQ = lib.restQuat.get('hand_r')!.toArray().map((n) => n.toFixed(3)).join(',');
+        console.log(`[debugHand] ${name} clip=${clip} phase=${spec.phase} yaw=${root.rotation.y.toFixed(2)} local q=${hand.quaternion.toArray().map((n) => n.toFixed(3)).join(',')} X->${ax(new THREE.Vector3(1, 0, 0))} Y->${ax(new THREE.Vector3(0, 1, 0))} rest=${restQ} ref=${refQ}`);
+      }
     }
-    let t = 0;
     return {
       root,
       height,
       triangles,
       update(dt) {
-        t += dt;
-        const dbg = new URLSearchParams(location.search).get('debug');
-        if (dbg) {
-          poseDebug(poser, dbg);
-          return;
-        }
-        if (mixer) {
-          mixer.update(dt);
-          return;
-        }
-        if (spec.pose === 'walk') poseWalk(poser, t, 1.4);
-        else if (spec.pose === 'cast') {
-          poseCast(poser, t);
-          if (rod) placeRod(rod, poser, CAST_ROD_DIR);
-        } else poseIdle(poser, t);
+        if (spec.phase !== undefined) return;
+        animator.update(dt);
       },
       dispose() {
+        animator.dispose();
         root.removeFromParent();
       },
     };

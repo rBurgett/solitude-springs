@@ -162,8 +162,9 @@ export async function launchChromium({ width = 1280, height = 720, gpu = false, 
   async function navigate(url) {
     await send('Page.navigate', { url });
   }
-  async function screenshot(file) {
-    const r = await send('Page.captureScreenshot', { format: 'png' });
+  /** PNG screenshot; `clip` = {x, y, width, height, scale} zooms into a region (CSS pixels). */
+  async function screenshot(file, clip) {
+    const r = await send('Page.captureScreenshot', clip ? { format: 'png', clip: { scale: 1, ...clip } } : { format: 'png' });
     await mkdir(path.dirname(file), { recursive: true });
     await writeFile(file, Buffer.from(r.data, 'base64'));
     return file;

@@ -29,7 +29,7 @@ export const SKY_PRESETS: Record<TimeOfDay, SkyPreset> = {
     sunAzimuthDeg: 225, sunElevationDeg: 52,
     sunColor: new THREE.Color(1.0, 0.96, 0.88), sunIntensity: 2.8,
     hemiSky: new THREE.Color(0.55, 0.7, 1.0), hemiGround: new THREE.Color(0.3, 0.32, 0.2), hemiIntensity: 0.15,
-    fogColor: new THREE.Color(0.72, 0.8, 0.88), fogDensity: 0.009, exposure: 0.78,
+    fogColor: new THREE.Color(0.72, 0.8, 0.88), fogDensity: 0.0042, exposure: 0.78,
     hdri: 'day', envIntensity: 0.45,
     zenith: new THREE.Color(0.2, 0.42, 0.85), horizon: new THREE.Color(0.72, 0.82, 0.92),
   },
@@ -37,7 +37,7 @@ export const SKY_PRESETS: Record<TimeOfDay, SkyPreset> = {
     sunAzimuthDeg: 95, sunElevationDeg: 9,
     sunColor: new THREE.Color(1.0, 0.7, 0.45), sunIntensity: 2.2,
     hemiSky: new THREE.Color(0.65, 0.6, 0.75), hemiGround: new THREE.Color(0.25, 0.22, 0.18), hemiIntensity: 0.3,
-    fogColor: new THREE.Color(0.9, 0.78, 0.7), fogDensity: 0.014, exposure: 0.8,
+    fogColor: new THREE.Color(0.9, 0.78, 0.7), fogDensity: 0.0065, exposure: 0.8,
     hdri: 'golden', envIntensity: 0.5,
     zenith: new THREE.Color(0.3, 0.4, 0.7), horizon: new THREE.Color(1.0, 0.75, 0.55),
   },
@@ -45,7 +45,7 @@ export const SKY_PRESETS: Record<TimeOfDay, SkyPreset> = {
     sunAzimuthDeg: 275, sunElevationDeg: 7,
     sunColor: new THREE.Color(1.0, 0.6, 0.35), sunIntensity: 2.0,
     hemiSky: new THREE.Color(0.6, 0.5, 0.7), hemiGround: new THREE.Color(0.25, 0.2, 0.16), hemiIntensity: 0.3,
-    fogColor: new THREE.Color(0.85, 0.66, 0.6), fogDensity: 0.014, exposure: 0.78,
+    fogColor: new THREE.Color(0.85, 0.66, 0.6), fogDensity: 0.0065, exposure: 0.78,
     hdri: 'golden', envIntensity: 0.5,
     zenith: new THREE.Color(0.25, 0.3, 0.6), horizon: new THREE.Color(1.0, 0.65, 0.45),
   },
@@ -53,7 +53,7 @@ export const SKY_PRESETS: Record<TimeOfDay, SkyPreset> = {
     sunAzimuthDeg: 160, sunElevationDeg: 48,
     sunColor: new THREE.Color(0.62, 0.74, 1.0), sunIntensity: 1.0,
     hemiSky: new THREE.Color(0.2, 0.26, 0.46), hemiGround: new THREE.Color(0.05, 0.06, 0.05), hemiIntensity: 1.0,
-    fogColor: new THREE.Color(0.035, 0.055, 0.1), fogDensity: 0.014, exposure: 1.15,
+    fogColor: new THREE.Color(0.035, 0.055, 0.1), fogDensity: 0.008, exposure: 1.15,
     hdri: null, envIntensity: 0.25,
     zenith: new THREE.Color(0.01, 0.02, 0.06), horizon: new THREE.Color(0.06, 0.09, 0.16),
   },
@@ -112,9 +112,57 @@ export interface LightingRig {
   /** Equirect HDRI textures by key (loaded lazily), for the water reflection. */
   hdris: Partial<Record<'day' | 'golden', THREE.Texture>>;
   apply(scene: THREE.Scene, renderer: THREE.WebGLRenderer, time: TimeOfDay): void;
+  /** Apply any preset (e.g. a blend from `blendPresets`); `nightWeight` shows the star dome. */
+  applyPreset(scene: THREE.Scene, renderer: THREE.WebGLRenderer, p: SkyPreset, nightWeight?: number): void;
   /** Point the shadow frustum at a world position. */
   follow(target: THREE.Vector3): void;
   preset: SkyPreset;
+}
+
+/** Linear blend of two presets (colours, numbers, sun angles). The HDRI of the heavier side wins. */
+export function blendPresets(a: SkyPreset, b: SkyPreset, t: number): SkyPreset {
+  const l = (x: number, y: number): number => x + (y - x) * t;
+  const c = (x: THREE.Color, y: THREE.Color): THREE.Color => x.clone().lerp(y, t);
+  return {
+    sunAzimuthDeg: l(a.sunAzimuthDeg, b.sunAzimuthDeg),
+    sunElevationDeg: l(a.sunElevationDeg, b.sunElevationDeg),
+    sunColor: c(a.sunColor, b.sunColor),
+    sunIntensity: l(a.sunIntensity, b.sunIntensity),
+    hemiSky: c(a.hemiSky, b.hemiSky),
+    hemiGround: c(a.hemiGround, b.hemiGround),
+    hemiIntensity: l(a.hemiIntensity, b.hemiIntensity),
+    fogColor: c(a.fogColor, b.fogColor),
+    fogDensity: l(a.fogDensity, b.fogDensity),
+    exposure: l(a.exposure, b.exposure),
+    hdri: t < 0.5 ? a.hdri : b.hdri,
+    envIntensity: l(a.envIntensity, b.envIntensity),
+    zenith: c(a.zenith, b.zenith),
+    horizon: c(a.horizon, b.horizon),
+  };
+}
+
+/**
+ * Preset for a cycle fraction (0 = start of dawn, see sim/clock): night → dawn → day → dusk → night,
+ * with the phase lengths from tunables. Returns the blended preset and the night weight.
+ */
+export function presetForCycle(f: number, phases: { dawn: number; day: number; dusk: number }): { preset: SkyPreset; nightWeight: number } {
+  const P = SKY_PRESETS;
+  const dawnEnd = phases.dawn;
+  const dayEnd = dawnEnd + phases.day;
+  const duskEnd = dayEnd + phases.dusk;
+  const smooth = (u: number): number => u * u * (3 - 2 * u);
+  if (f < dawnEnd) {
+    const u = f / dawnEnd;
+    if (u < 0.5) return { preset: blendPresets(P.night, P.dawn, smooth(u * 2)), nightWeight: 1 - smooth(u * 2) };
+    return { preset: blendPresets(P.dawn, P.day, smooth((u - 0.5) * 2)), nightWeight: 0 };
+  }
+  if (f < dayEnd) return { preset: P.day, nightWeight: 0 };
+  if (f < duskEnd) {
+    const u = (f - dayEnd) / (duskEnd - dayEnd);
+    if (u < 0.5) return { preset: blendPresets(P.day, P.dusk, smooth(u * 2)), nightWeight: 0 };
+    return { preset: blendPresets(P.dusk, P.night, smooth((u - 0.5) * 2)), nightWeight: smooth((u - 0.5) * 2) };
+  }
+  return { preset: P.night, nightWeight: 1 };
 }
 
 export interface HdriSources {
@@ -169,7 +217,10 @@ export async function createLightingRig(renderer: THREE.WebGLRenderer, sources: 
     hdris,
     preset,
     apply(scene, r, time) {
-      preset = SKY_PRESETS[time];
+      rig.applyPreset(scene, r, SKY_PRESETS[time], time === 'night' ? 1 : 0);
+    },
+    applyPreset(scene, r, p, nightWeight = 0) {
+      preset = p;
       rig.preset = preset;
       sunDirection(preset, dir);
       sun.color.copy(preset.sunColor);
@@ -180,17 +231,17 @@ export async function createLightingRig(renderer: THREE.WebGLRenderer, sources: 
       scene.fog = new THREE.FogExp2(preset.fogColor.getHex(), preset.fogDensity);
       r.toneMappingExposure = preset.exposure;
       const env = preset.hdri ? envs[preset.hdri] : undefined;
-      if (env) {
+      if (env && nightWeight < 0.5) {
         scene.environment = env;
         scene.environmentIntensity = preset.envIntensity;
         scene.background = hdris[preset.hdri as 'day' | 'golden'] ?? null;
-        scene.backgroundIntensity = preset.envIntensity;
+        scene.backgroundIntensity = preset.envIntensity * (1 - nightWeight * 2);
         scene.backgroundBlurriness = 0;
         nightDome.visible = false;
       } else {
         scene.environment = null;
         scene.background = preset.zenith;
-        nightDome.visible = time === 'night';
+        nightDome.visible = nightWeight >= 0.5;
       }
       rig.follow(target);
     },

@@ -16,12 +16,13 @@
 
 This plan was written from a design conversation with the owner. Everything decided there is captured in §1 and the sections below, so you don't need that conversation. `prompt.md` is the owner's original brief, kept for history only.
 
-**Current state (2026-09-11) — M0 built, awaiting the M0 checkpoint**
+**Current state (2026-09-11) — M1 built, awaiting the M1 checkpoint**
 
-- Scaffold in place: Vite 8.2.2 + TypeScript 7.0.2 (strict, `erasableSyntaxOnly`), three 0.185.1, `@dimforge/rapier3d-compat` 0.20.0 (installed, not yet used), `.npmrc` release-age buffer, `tools/check-deps-age.mjs`, `tools/npm-safe.mjs`, `node --test` suites (12 tests), the CDP harness (`tools/cdp.mjs`, `smoke.mjs`, `shots.mjs`), the checksum-verified asset fetcher (`tools/fetch-assets.mjs` + `assets-src/assets.json` → `ASSETS.md`).
-- Look-dev: `lab/characters.html` (bake-off, candidates A/B/C) and `lab/vignette.html` (riverbank, day/dawn/dusk/night × clean/trashed). World modules under `src/world/` (terrain + splat material with trash mask, water shader, instanced grass, EZ-Tree forests, bridge, litter, day/night rig, fireflies) and `src/character/` (bone map, rig-agnostic poser, glTF helpers).
-- Character pipeline: MPFB 2.0.17 installed in the Blender 5.2 flatpak; `assets-src/characters/blender/generate.py` builds the bake-off figures headlessly from `assets-src/characters/bakeoff.json` into `public/assets/built/characters/mpfb/`.
-- Nothing playable yet. **M0 checkpoint done (2026-09-11): character family A, Southeastern setting, in-house alligator (§1 #25–28). M1 may start once the owner says so.** Screenshot evidence is in `shots-out/m0/` (git-ignored; regenerate with `npm run shots -- --gpu --out=shots-out/m0`).
+- Everything from M0 plus the M1 build list (§20): retargeted animation library and hand-authored fishing clips on the MPFB rig, the two player bodies with every garment and the underwear layer, the full valley blockout, the player controller (Rapier), the fishing loop, hotbar/backpack/paper doll, saves (IndexedDB + export/import), menus/settings/controls/pause/credits, generative audio, and the debug console.
+- **Play it:** `npm run dev` → the game is the root page. New Game opens the creator; the world is built once at boot and the main menu flies over it. Dev builds open the console with `` ` ``.
+- **Evidence for the checkpoint** (all run 2026-09-11): `npm run typecheck`, `npm test` (42 pass), `npm run deps:check` (all ≥ 14 d), `npm run build`, `npm run smoke --gpu` (the full §20 M1 scripted path passes with zero console errors; screenshots in `smoke-out/`), `npm run perf --preset=medium` on the Intel Iris Xe at 1080p (see §20 M1 status), look-dev sets in `shots-out/m1-anim`, `shots-out/m1-player`, `shots-out/m1-map`.
+- **Not met yet:** the Medium/Iris Xe budget is close but not fully there (worst station 50 fps, p95 21 ms at the spring pool; four of six stations at 60 fps). The production bundle still copies all of `public/` (222 MB). Both carried into M2/M4 (§20 M1 status).
+- The M0 lab pages still work (`lab/index.html`); the M1 lab additions are the player-body rows, the animation flip-books and the map viewer.
 - `prompt.md` was dropped from the repository (owner decision, §1 #22).
 
 **Verified environment (Linux)**
@@ -37,13 +38,9 @@ This plan was written from a design conversation with the owner. Everything deci
 
 **First steps**
 
-1. Read §0–§4 and §20 (M0) in full. Skim the rest; read each section fully when its milestone starts.
-2. Ask the owner three things:
-   - Is it OK to start M0?
-   - Is it OK to upgrade npm to ≥ 11.10?
-   - Is it OK to install MPFB2 into Blender?
+1. Read §0–§4 and §20 (M1 status) in full. Skim the rest; read each section fully when its milestone starts.
+2. The M1 checkpoint is pending: **do not start M2 until the owner has played the build and replied.** Record the feedback in §1 / §22 first.
 3. Re-verify licenses before using any asset. Appendix A (§23) has the 2026-09-10 research with source links, but licenses and free tiers change.
-4. Build M0 as specified, then stop at its checkpoint.
 
 **Working rules**
 
@@ -74,6 +71,8 @@ This plan was written from a design conversation with the owner. Everything deci
 - 2026-09-10 — Owner approved M0, the npm upgrade and the MPFB2 install; `prompt.md` dropped (§1 #22–24).
 - 2026-09-11 — M0 checkpoint: owner chose MPFB2, confirmed the setting, specified the underwear layer and asked for the Quaternius-quality walk on the MPFB rig (§1 #25–28); §22 items 1–3 resolved; M1 build list amended.
 - 2026-09-11 — M0 built (§0.1 current state, §20 M0 status). Recorded tool versions (§4.5), the M0 character findings (§4.3), allowlist additions `@types/node` and `@dgreenheck/ez-tree` (§3.3), asset notes (§23) and the implementer's recommendation for the checkpoint (§22).
+- 2026-09-11 — M0 committed (`3ef726b`). Owner said to start M1.
+- 2026-09-11 — M1 built (§0.1 current state, §20 M1 status). Recorded the animation retargeting method and the authored clips (§4.4), the player-body pipeline findings (§4.3), the layout resolution rule (§7.1), perf numbers (§17), and the M1 checkpoint asks (§22). No new dependencies.
 
 ---
 
@@ -273,6 +272,13 @@ The owner picks one.
 - **Candidate B** (free tier) only ships the two "Superhero" bodies with a baked suit texture and six hairstyles; the Regular/Teen bodies and the .blend sources are paid. Its UAL1 clips play directly (Walk_Loop/Idle_Loop verified). Every modern garment would have to be modelled and skinned. Note the site license changed to "QAL v1.0" on 2026-08-28 (non-retroactive; the downloaded archives carry CC0 text).
 - **Candidate C** ported as a baseline (`lab/candidates/c/`), with underwear and male-dress variants painted/lofted procedurally.
 
+**M1 findings (2026-09-11) — player bodies**
+
+- `assets-src/characters/players.json` → `generate.py` builds `player_male.glb` / `player_female.glb` (23–25 MB each): one body, four hairstyles (`hair_<id>`) and nineteen garments (`garment_<id>`) as separate skinned meshes fitted to that body, plus three skin diffuse textures (`player_<sex>.skin.<key>.jpg`) for the creator's swatches. The runtime (`src/character/character.ts`) toggles meshes, swaps the skin map and tints hair/garment materials. Node names use underscores because three.js strips `.`, `:` and `/`.
+- **Body under clothes:** MPFB hides body vertices under each garment with a *delete group* + Mask modifier. With every garment in one file the masks can't be applied, so they're exported as two per-vertex bitfield attributes (`_GARMENTMASKA/B`) and the body shader discards fragments under the worn garments. Bitfields must not be interpolated: the varying is `flat` and each triangle is rotated so its most-covered vertex is the provoking one (reproduces Blender's "any vertex masked → face removed").
+- **Underwear layer (§1 #26):** male `cortu_jeans_shorts` with a generated red polka-dot texture; female `wolgade_female_top_01` + `cortu_jeans_shorts` in white. Each piece is shown only while its slot is empty (otherwise it pokes through the outer garment).
+- Known cosmetic gaps: garment-on-garment overlap at some hems (sweater over sweatpants), the Poly Haven skin textures are photo-based so very dark tints flatten; no hat models beyond a fedora yet.
+
 ### 4.4 Animation
 
 All clips are retargeted onto the chosen skeleton and stored as a shared animation library `.glb`.
@@ -286,6 +292,8 @@ All clips are retargeted onto the chosen skeleton and stored as a shared animati
 Microsoft Rocketbox (MIT; talk, dance and drink clips) is a **reference/alternative source** only if retargeting its 3ds Max Biped rig proves easy. Its characters are not used (their clothing is baked into the body mesh, and they'd clash in style). CMU mocap is avoided (unclear redistribution terms).
 
 **Animation layers:** full-body locomotion, plus an upper-body layer (cast, reel, aim, drink, talk gestures), plus additive lean. Procedural touches: head look-at toward the speaker or bobber, and a breathing idle.
+
+**M1 implementation (2026-09-11).** `assets-src/characters/blender/retarget.py` imports the UAL1/UAL2 GLBs and the reference character (`male_default.glb`), then for every mapped bone applies the source bone's **world-space rotation delta from its own rest** to the target rest, after re-aiming the target rest bone along the source rest bone's direction (this removes the A-pose vs T-pose mismatch; leaves inherit the parent's alignment; the pelvis also takes the hip translation scaled by hip height). 51 clips (`assets-src/characters/animations.json`) plus the hand-authored clips from `assets-src/characters/poses.json` (`fish_idle`, `cast_charge`, `cast_release`, `cast`, `reel`, `hands_up`; poses are per-bone aims/orients in the character frame, finger shapes borrowed from retargeted clips) export to `public/assets/built/characters/mpfb/male_default.anims.glb` (7.4 MB, all channels kept). At runtime `src/character/animLibrary.ts` re-binds each clip onto any MPFB body as the same parent-space delta on that body's rest (a female-native bake and the re-bound male library are indistinguishable in the lab), and `src/character/animator.ts` runs the lower/upper split on one mixer. Verified visually in `lab/characters.html?candidate=p&shot=anim&clip=<name>`.
 
 ### 4.5 Other assets
 
@@ -415,6 +423,7 @@ A bounded, hand-laid valley **~600 × 600 m** (about 2 minutes to walk across), 
           ~~ Gator Marsh ~~ ── downstream end
 ```
 
+- **Implementation note (M1):** the river is a meandering spline (`src/world/valley.ts`), so area centres, the campground, the beach, the dock, the bridges and the switchback are authored *relative to the river* (`src/data/world.ts` templates: side + offset from the water's edge) and resolved by the valley. Zones are river z-ranges.
 - A bank trail runs along the east bank the whole way.
 - A second trail follows the west bank from Cedar Bridge to the suspension footbridge.
 - Deep Woods cover the west slopes, and boundary ridges ring the valley.
@@ -1248,6 +1257,8 @@ Every human NPC is in one of three states:
 - Total download for the first load ≤ 150 MB (lazy-load the rest).
 - Quality presets scale shadows, render scale, grass density, level-of-detail distances and bloom.
 
+**M1 measurements (2026-09-11, `npm run perf`, Chromium on the Intel Iris Xe, 1920×1080, six stations, walking):** Medium (render scale 0.8, 1024² shadow map, ~38k grass blades, trees within 95 m as meshes and impostors beyond): p50 16.6–20.2 ms, worst p95 21.0 ms (spring pool), 50–60 fps, 58–172 draw calls, 0.5–1.9 M triangles. Low: 53–60 fps everywhere. The remaining Medium cost is fill (terrain splat, water, grass) at the pool; candidates for M4: cheaper water far from the camera, a lighter grass material, cascaded/tighter shadows. The RTX 4050 runs the smoke path at 60 fps (vsync).
+
 ---
 
 ## 18. Code architecture
@@ -1375,6 +1386,9 @@ Each milestone ends at a **checkpoint**: the implementer runs §19, sends the ev
 
 ### M1 — "Tranquil" vertical slice
 
+**Status (2026-09-11): built; checkpoint pending.** Evidence: `npm ci`, `typecheck`, `test` (42 pass), `deps:check` (all ≥ 14 d) and `build` pass; `npm run smoke --gpu` plays the whole acceptance path below with zero console errors (screenshots `smoke-out/01…15`); `npm run perf --preset=medium` on the Iris Xe: 50–60 fps, worst p95 21 ms (§17). Look-dev evidence: `shots-out/m1-anim/*` (retargeted clips on both bodies), `shots-out/m1-player/*` (underwear layer, wardrobe, skins, hair), `shots-out/m1-map/*` (overhead + vistas).
+Acceptance not fully met: **60 fps Medium on Iris Xe** — four of six stations hit 60, the spring pool sits at 50 fps / p95 21 ms. Known gaps carried forward: production bundle copies all of `public/` (222 MB; needs a manifest-driven copy and texture compression), no cascaded shadows (shadows only within ±40 m of the player), impostor trees are flat billboards, the rod/bobber/pickups are placeholder geometry, no recorded ambience (§22 #4), the bridge decks have no sway, fish have no in-hand model (the reveal is a hold-up animation + toast).
+
 **Build**
 
 - **Menus & settings:** main menu with flyover; Settings (all groups incl. the Pause-during-conversations toggle); Controls with rebinding + restore defaults; pause menu; Credits stub.
@@ -1471,12 +1485,14 @@ Resolve at the noted checkpoint, then move each into §1.
 1. ~~Character family~~ — resolved 2026-09-11: A (§1 #25).
 2. ~~Setting~~ — resolved 2026-09-11: Southeastern springs (§1 #27).
 3. ~~Alligator model~~ — default kept: in-house (§1 #28); the owner can still swap in a sourced model later.
-4. **Recorded CC0 ambience** vs. synthesis-only. *M1.*
+4. **Recorded CC0 ambience** vs. synthesis-only. *M1 shipped synthesis only (river noise, wind, birds, frogs/crickets/owl, plucked score). Owner to judge at the M1 checkpoint.*
 5. **Pacing targets** after the first real play-test (events/hour, fish/hour). *M2.*
 6. **Alien interior vignette** — keep, shorten, or cut. *M2.*
 7. **Dialogue tone review** — any roster seeds to cut, change or add. *M2/M3.*
 
 **M0 checkpoint outcome (2026-09-11):** the owner picked A (MPFB2) and confirmed the setting; see §1 #25–28 for the feedback that shapes M1.
+
+**M1 checkpoint asks (2026-09-11):** (a) does the walk/jog/cast/reel animation now read as real motion on the MPFB bodies? (b) is the valley layout right (trailhead ridge → pool → three bridges → campground → beach → dock → marsh)? (c) underwear layer as specified? (d) synthesized audio acceptable or add CC0 recordings? (e) any art-direction notes before M2 fills the world with people.
 
 ---
 

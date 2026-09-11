@@ -18,6 +18,16 @@ export interface FigureSpec {
   pants: string;
   dress: string;
   pose: Pose;
+  /** Library clip to play instead of the pose's default (candidate A only). */
+  clip?: string;
+  /** Animation phase 0..1 of the clip to freeze at (screenshots); omit to play live. */
+  phase?: number;
+  /** Which animation library to bind: 'male' (reference, re-bound) or 'female' (native bake). */
+  lib?: 'male' | 'female';
+  /** Candidate P overrides: skin swatch index, hair style id, outfit spec ("top:polo,bottom:shorts,shoes:hiking_boots"). */
+  skinIndex?: number;
+  hairStyle?: string;
+  outfitSpec?: string;
 }
 
 export interface Figure {
@@ -32,7 +42,7 @@ export interface Figure {
 }
 
 export interface Candidate {
-  id: 'a' | 'b' | 'c';
+  id: 'a' | 'b' | 'c' | 'p';
   label: string;
   /** Build one figure. May load assets (glTF) on first use. */
   create(spec: FigureSpec): Promise<Figure>;
