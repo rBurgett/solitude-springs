@@ -7,6 +7,10 @@ import { TOTAL_SLOTS, HOTBAR, type InventoryState, type ItemStack, type WornSlot
 import { createJournal, createStats, type JournalState, type StatsState } from '../journal.ts';
 import { SCHEMA_VERSION, type SaveRecord } from './schema.ts';
 import { migrateSave } from './migrate.ts';
+import { isKnownNpc } from '../../data/npcs.ts';
+import { isEventType } from '../../data/events.ts';
+import { createMemory, type NpcMemory } from '../npcMemory.ts';
+import type { DirectorSave } from '../director.ts';
 
 export const NAME_MAX = 24;
 
@@ -78,6 +82,51 @@ function validateJournal(v: unknown): JournalState {
   return j;
 }
 
+function stackList(v: unknown, max = 64): ItemStack[] {
+  if (!Array.isArray(v)) return [];
+  const out: ItemStack[] = [];
+  for (const x of v.slice(0, max)) {
+    const s = stack(x);
+    if (s) out.push(s);
+  }
+  return out;
+}
+
+export function validateNpcMemory(v: unknown): NpcMemory {
+  const m = createMemory();
+  if (!isObj(v)) return m;
+  m.met = int(v.met, 0, 0, 1e6);
+  m.robbed = int(v.robbed, 0, 0, 1e6);
+  m.poofed = int(v.poofed, 0, 0, 1e6);
+  m.relationship = int(v.relationship, 0, -100, 100);
+  m.grudge = bool(v.grudge, false);
+  m.inventory = stackList(v.inventory);
+  m.stolen = stackList(v.stolen);
+  m.lastSeenDay = int(v.lastSeenDay, 0, 0, 1e6);
+  m.poofedAt = num(v.poofedAt, 0, 0, 1e7);
+  if (isObj(v.flags)) for (const [k, f] of Object.entries(v.flags)) if (/^[a-zA-Z0-9_]{1,32}$/.test(k) && typeof f === 'boolean') m.flags[k] = f;
+  return m;
+}
+
+export function validateNpcs(v: unknown): Record<string, NpcMemory> {
+  const out: Record<string, NpcMemory> = {};
+  if (!isObj(v)) return out;
+  for (const [id, m] of Object.entries(v)) if (isKnownNpc(id)) out[id] = validateNpcMemory(m);
+  return out;
+}
+
+export function validateDirector(v: unknown): DirectorSave {
+  const d = isObj(v) ? v : {};
+  const cooldownsRemaining: DirectorSave['cooldownsRemaining'] = {};
+  if (isObj(d.cooldownsRemaining)) for (const [k, t] of Object.entries(d.cooldownsRemaining)) if (isEventType(k)) cooldownsRemaining[k] = num(t, 0, 0, 1e5);
+  const recent: DirectorSave['recent'] = {};
+  if (isObj(d.recent)) for (const [k, t] of Object.entries(d.recent)) if (isEventType(k)) recent[k] = num(t, 0, 0, 1e7);
+  return {
+    wanted: num(d.wanted, 0, 0, 10), ufoRecentUntil: num(d.ufoRecentUntil, 0, 0, 1e7), lull: bool(d.lull, false), sessionSeconds: num(d.sessionSeconds, 0, 0, 1e8),
+    cooldownsRemaining, lullScheduledDay: int(d.lullScheduledDay, 0, 0, 1e6), lullAtFraction: num(d.lullAtFraction, -1, -1, 1), recent, eventsRun: int(d.eventsRun, 0, 0, 1e7),
+  };
+}
+
 function validateStats(v: unknown): StatsState {
   const s = createStats();
   if (!isObj(v)) return s;
@@ -130,7 +179,9 @@ export function validateSave(input: unknown): SaveRecord | null {
   if (isObj(w.zones)) {
     for (const [id, z] of Object.entries(w.zones)) {
       if (!isObj(z) || !/^[a-z0-9_]{1,32}$/.test(id)) continue;
-      world.zones[id] = { population: num(z.population, 1, 0, 1), trash: num(z.trash, 0, 0, 1) };
+      const rec: SaveRecord['world']['zones'][string] = { population: num(z.population, 1, 0, 1), trash: num(z.trash, 0, 0, 1) };
+      if (Array.isArray(z.trashCenter) && z.trashCenter.length >= 2) rec.trashCenter = [num(z.trashCenter[0], 0, -5000, 5000), num(z.trashCenter[1], 0, -5000, 5000)];
+      world.zones[id] = rec;
     }
   }
   if (Array.isArray(w.boat) && w.boat.length >= 4) {
@@ -145,7 +196,6 @@ export function validateSave(input: unknown): SaveRecord | null {
       world.pickups.push({ id: str(pk.id, '', 64) || `${world.pickups.length}`, itemId: s.id, count: s.count, ...(s.color ? { color: s.color } : {}), position: vec3(pk.position, [0, 0, 0]) });
     }
   }
-  const d = isObj(v.director) ? v.director : {};
   const pr = isObj(v.progress) ? v.progress : {};
   const achievements: Record<string, string> = {};
   if (isObj(pr.achievements)) {
@@ -163,8 +213,8 @@ export function validateSave(input: unknown): SaveRecord | null {
     character,
     player,
     world,
-    npcs: isObj(v.npcs) ? v.npcs : {},
-    director: { wanted: int(d.wanted, 0, 0, 10), ufoRecentUntil: num(d.ufoRecentUntil, 0, 0, 1e9), lull: bool(d.lull, false) },
+    npcs: validateNpcs(v.npcs),
+    director: validateDirector(v.director),
     progress: { achievements, stats: validateStats(pr.stats), journal: validateJournal(pr.journal), serenity: num(pr.serenity, TUNABLES.serenity.start, 0, 1) },
     rng: { seed: int(rng.seed, 1, 0, 4294967295), state: int(rng.state, 1, 0, 4294967295) },
   };

@@ -16,13 +16,13 @@
 
 This plan was written from a design conversation with the owner. Everything decided there is captured in §1 and the sections below, so you don't need that conversation. `prompt.md` is the owner's original brief, kept for history only.
 
-**Current state (2026-09-11) — M1 built, awaiting the M1 checkpoint**
+**Current state (2026-09-11) — M2 built, awaiting the M2 checkpoint**
 
-- Everything from M0 plus the M1 build list (§20): retargeted animation library and hand-authored fishing clips on the MPFB rig, the two player bodies with every garment and the underwear layer, the full valley blockout, the player controller (Rapier), the fishing loop, hotbar/backpack/paper doll, saves (IndexedDB + export/import), menus/settings/controls/pause/credits, generative audio, and the debug console.
-- **Play it:** `npm run dev` → the game is the root page. New Game opens the creator; the world is built once at boot and the main menu flies over it. Dev builds open the console with `` ` ``.
-- **Evidence for the checkpoint** (all run 2026-09-11): `npm run typecheck`, `npm test` (42 pass), `npm run deps:check` (all ≥ 14 d), `npm run build`, `npm run smoke --gpu` (the full §20 M1 scripted path passes with zero console errors; screenshots in `smoke-out/`), `npm run perf --preset=medium` on the Intel Iris Xe at 1080p (see §20 M1 status), look-dev sets in `shots-out/m1-anim`, `shots-out/m1-player`, `shots-out/m1-map`.
-- **Not met yet:** the Medium/Iris Xe budget is close but not fully there (worst station 50 fps, p95 21 ms at the spring pool; four of six stations at 60 fps). The production bundle still copies all of `public/` (222 MB). Both carried into M2/M4 (§20 M1 status).
-- The M0 lab pages still work (`lab/index.html`); the M1 lab additions are the player-body rows, the animation flip-books and the map viewer.
+- Everything from M1 plus the M2 build list (§20): the 58-name roster with looks, voices, trading and dialogue (all 58 have full trees; the tone review is §22 #7), NPC framework (character factory on the two player bodies, trail-graph navigation + steering, look-at), the dialogue box with typewriter and gibberish voices, trading with live moods, NPC memory, the Annoyance Director (serenity, grace periods, pacing ramp, lulls, eligibility, cooldowns) with `npm run simulate`, the events — camper/hiker visits, water-walkers (Marina included), thieves (loot, strip, pity barrel, getaway, loot kept in memory), parties (music, dancing, brown grass, cans, beer water, population 0, recovery, cleanup), the bear, the alligator, UFO abductions (same-spot return, outfit replacement, missing time, glowing perch), grudge returns — health/damage/death, and the tutorial narrator cut off by the scripted thief.
+- **Play it:** `npm run dev` → the game is the root page. Events arrive on their own after the 4-minute grace; every one can be forced from the console (`event <type> [npcId]`, `npc <id>`, `talk <id>`).
+- **Evidence for the checkpoint** (all run 2026-09-11): `npm run typecheck`, `npm test` (64 pass), `npm run deps:check` (all ≥ 16 d), `npm run build`, `npm run simulate` (passes: see §20 M2 status), `npm run smoke -- --gpu` plays the M1 path and then forces every M2 event with zero console errors (34 screenshots in `smoke-out/`: visit + dialogue + trade, the pause toggle, the strip and the pity barrel, the party with 22 cans → zero bites → save/load mid-trash → collecting every can clears the water, the bear taking only the fish, Marina rising, the gator bite, Wade's grudge demand, the abduction returning within 0.1 m in a new outfit). `npm run perf -- --preset=medium` on the Intel Iris Xe at 1080p: the six M1 stations at 60 fps (p95 ≤ 17.5 ms); the new `party` station (six NPCs, music, props) at 47 fps / p95 22.9 ms, 214 draw calls, 1.4 M triangles — the M2 worst case and over budget (§17); NPC levels of detail and shared materials are the M4 fix.
+- **Not met yet / carried:** the ranger event, weapons, the boat and the M3 confrontation rules are stubs (`onThreatened` hooks exist on every runner); the bear is an in-house placeholder until the owner downloads the Sketchfab model (README "Asset pipeline"); the bundle still copies all of `public/` (222 MB); the Medium/Iris Xe budget holds at the M1 stations but a party (six NPCs) drops to 47 fps (§17).
+- The M0/M1 lab pages still work (`lab/index.html`).
 - `prompt.md` was dropped from the repository (owner decision, §1 #22).
 
 **Verified environment (Linux)**
@@ -39,7 +39,7 @@ This plan was written from a design conversation with the owner. Everything deci
 **First steps**
 
 1. Read §0–§4 and §20 (M1 status) in full. Skim the rest; read each section fully when its milestone starts.
-2. The M1 checkpoint is pending: **do not start M2 until the owner has played the build and replied.** Record the feedback in §1 / §22 first.
+2. The M1 checkpoint passed on 2026-09-11 (§1 #31). **The M2 checkpoint is in progress:** the owner's first round of M2 notes (§1 #32–35) is fixed and re-verified; do not start M3 until the owner is satisfied. Record further feedback in §1 / §22 first (the pacing targets, §22 #5, and the dialogue tone, §22 #7, are the open asks).
 3. Re-verify licenses before using any asset. Appendix A (§23) has the 2026-09-10 research with source links, but licenses and free tiers change.
 
 **Working rules**
@@ -75,6 +75,9 @@ This plan was written from a design conversation with the owner. Everything deci
 - 2026-09-11 — Owner feedback round 2: bridge rope rails now have thin colliders (walking off a deck into the river is no longer possible; bridge ends stay open). Verified by a sideways-walk probe on all three bridges and the smoke path.
 - 2026-09-11 — M1 committed (`7a2d82e`). First owner play feedback recorded (§1 #29–30) and fixed: bite delay 10–40 s; the player no longer creeps down slopes while standing (horizontal position frozen when idle and grounded; 1 m physics heightfield; gentler deep-water push); bridges no longer count as wading (depth is measured from the feet, not the terrain under the deck — this also fixed the stall mid-bridge); the sprint's torso lean is scaled down in the retarget (`lean` per clip).
 - 2026-09-11 — M1 built (§0.1 current state, §20 M1 status). Recorded the animation retargeting method and the authored clips (§4.4), the player-body pipeline findings (§4.3), the layout resolution rule (§7.1), perf numbers (§17), and the M1 checkpoint asks (§22). No new dependencies.
+- 2026-09-11 — M1 checkpoint outcome recorded (§1 #31, §22): the owner played two rounds, both sets of notes were fixed and committed (`e19c66f`, `f6564a4`), and said "Looking good" / continue. M2 started. Open asks (d) recorded ambience and (e) art direction carried in §22 for the owner to answer whenever.
+- 2026-09-11 — First M2 play notes (§1 #32–35): inventory moves fixed (+ click-to-move), Actual Solitude gated on the three-minute calm window, NPC outfits mapped through the item catalog (no accidental underwear), character capsules in their own collision group (no more airborne partiers). Dialogue, robbery, parties and achievements reported as working.
+- 2026-09-11 — M2 built (§0.1 current state, §20 M2 status). Recorded the NPC/dialogue/trading/Director implementation notes (§10, §11), the pacing tunables chosen from `npm run simulate` (§11.2), the save schema bump to 2 (§14.2), new console commands (§18.3), the M2 checkpoint asks (§22). No new dependencies.
 
 ---
 
@@ -112,6 +115,11 @@ This plan was written from a design conversation with the owner. Everything deci
 | 28 | Alligator | Owner gave no preference at M0; the plan's default stands: **in-house model** (Blender script + ambientCG textures), built in M2. |
 | 29 | Bite timing (M1 feedback, 2026-09-11) | Waits were too long: bite delay is now **10–40 s** (triangular, mode 20 s) instead of 15–90 s. |
 | 30 | Movement feel (M1 feedback) | The player must not creep down slopes while standing; bridges must not slow the player like wading; the sprint must not double over. |
+| 31 | M1 checkpoint (2026-09-11) | Passed: after rounds 1–2 (#29–30) plus solid bridge rails the owner said "Looking good" and told the implementer to continue. M2 started. The §22 asks (d) synthesized vs recorded ambience and (e) art-direction notes were not explicitly answered; they stay open and the defaults stand (synthesis only; no art changes). |
+| 32 | Nobody naked (M2 feedback, 2026-09-11) | The game is for the owner's kids: **no character may ever appear completely naked.** The underwear base layer stays as specified (#26), but an NPC must never spawn in it by accident (Deep Dive Doug did: his wetsuit item had no mesh mapping, so he rose from the river in boxers). Fixed by mapping roster outfits through the item catalog; a data test now proves every NPC outfit resolves to a garment mesh on its body and covers top and bottom. |
+| 33 | Actual Solitude too easy (M2 feedback) | The owner hit 100% serenity in the first minutes (the opening grace period). The achievement now requires **holding 100% for the full three-minute calm window** (the same gate as Old Gus), so the scripted thief at the end of the grace always interrupts it. |
+| 34 | Inventory moves (M2 feedback) | Items could not be moved between the hotbar and the backpack: the drag attribute was written as an empty string, which browsers ignore. Fixed, and **click-to-move** was added (click an item, click its destination or a worn slot) so the screen works without drag-and-drop. Round 2: a hovered tooltip survived closing the screen with Esc or E; it now lives inside the screen element. |
+| 35 | Partiers flying (M2 feedback) | NPCs walking in a group shot into the air and vanished: each one's ground probe could hit a neighbour's capsule. Character capsules now live in their own collision group that ground probes, the camera ray and the bobber ignore (the player still bumps into people). |
 
 ---
 
@@ -804,6 +812,8 @@ One-line seeds; full dialogue is written in M2/M3 and reviewed at checkpoints. *
 
 ---
 
+**M2 implementation (2026-09-11).** Roster: `src/data/npcs.ts` (58 records: archetypes, look on one of the two player bodies — hairstyle per body, garments from the item catalog, skin swatch, height scale — voice, catchphrases, gag, trading rules, loot, schedule, links, thief specialities). Dialogue: `src/data/dialogue.ts` defines the tree format (nodes with random line variants, `branches` for memory-driven starts, choices with requirements and effects) and `buildTree` generates every NPC's standard tree (greeting / again / menu / small talk / trade intro / goodbye / robbed / hands-up or fight-back / poof-return) from a lines sheet; `src/data/dialogue/*.ts` hold the sheets with gag nodes (Larry's keys, Carl's hat, Rosa's mushrooms, Silas's cans, Linda's kids, Kevin's pizza, Penelope's measuring, Gerald's gestures…), ≥ 3 bark overrides each and the event lines (thief beats, water-walker emergence, party whoops, grudge). The data-integrity test (`tests/data.test.ts`) enforces §10.6. Runtime: `src/sim/dialogue.ts` (pure runner), `src/gameplay/conversation.ts` (typewriter, voices, trading hand-off), `src/ui/dialogue.ts`, `src/ui/screens/trade.ts` (`src/sim/trading.ts` holds the valuation and deal rule), `src/sim/npcMemory.ts` (saved per id), `src/actors/npc.ts` + `src/gameplay/npcs.ts` + `src/gameplay/navigation.ts` (trail graph, A*, trunk-avoiding steering, kinematic capsules the player bumps into). Portraits are render-to-texture headshots taken when a conversation opens. The pity barrel and tinfoil hat are procedural meshes attached to bones (`src/character/character.ts`).
+
 ## 11. The Annoyance Director & events
 
 ### 11.1 Serenity meter
@@ -847,8 +857,10 @@ One-line seeds; full dialogue is written in M2/M3 and reviewed at checkpoints. *
 **Pacing targets** *(adjust after the owner play-tests)*:
 
 - ≥ 8 fish per hour for an attentive player after the first 30 min
-- 30–60 events per hour at full ramp
+- 30–60 events per hour at full ramp (measured outside the deliberate lull windows)
 - median time-to-Old-Gus 3–6 hours of play.
+
+**M2 implementation (2026-09-11).** `src/sim/director.ts` is the pure Director (serenity rules, grace, the gap ramp, minimum gaps, the fishing multiplier, lull scheduling, eligibility from `src/data/events.ts`, weighted picks, NPC picks that avoid recently seen and poofed NPCs, the save subset). The game snapshots a `Situation` (phase, area, water distance and kind, fish carried, save minutes, line out, grudge readiness) every step. `npm run simulate` (`tools/simulate.ts`) drives the Director plus a fishing model for hundreds of hours and fails on a missed target. Tuning against it changed three numbers from the text above, all in `src/data/tunables.ts`: the gap ramps to **45 s** (not 60: events themselves last 60–100 s, so a 60 s gap gave ~28/h), lulls are **5–9 minutes, none on day 1, and wait 60 s after the last event** (a 3–6 minute lull starting right after an event rarely reached 100% serenity for 3 minutes; day-1 lulls handed new players Old Gus in 12 minutes), and the legendary weight once eligible is **400** (Gus is gated by the calm window, so once it opens he should bite). Report at 150 simulated hours: ~32 events/hour at full ramp outside lulls, ~26 fish/hour, ~25% of bites lost to interruptions, median time-to-Old-Gus 3.1 h across 8 seeds (range 0.7–22 h). These are the owner's to retune (§22 #5).
 
 ### 11.3 Event table (defaults)
 
@@ -1080,7 +1092,7 @@ Every human NPC is in one of three states:
 
 | Name | How to earn |
 |---|---|
-| Actual Solitude | Reach 100% serenity. |
+| Actual Solitude | Hold 100% serenity for three whole minutes (the Old Gus calm window; owner feedback §1 #33). |
 | Breezy | Wear a dress for a full in-game day as a character who didn't start in one. |
 | Dapper | Wear a tuxedo for a full in-game day as a character who didn't start in one. |
 | Dressed by the River | Wear a full outfit made entirely of fished-up clothes. |
@@ -1100,7 +1112,7 @@ Every human NPC is in one of three states:
 - **Saves:** IndexedDB database `solitude-springs`, object store `saves`, keyed by a random save id. One record per character.
 - **Settings and key bindings:** `localStorage` (they apply to every save).
 
-### 14.2 Save record (`schemaVersion: 1`)
+### 14.2 Save record (`schemaVersion: 2`; version 1 saves migrate)
 
 | Part | Contents |
 |---|---|
@@ -1263,6 +1275,8 @@ Every human NPC is in one of three states:
 
 **M1 measurements (2026-09-11, `npm run perf`, Chromium on the Intel Iris Xe, 1920×1080, six stations, walking):** Medium (render scale 0.8, 1024² shadow map, ~38k grass blades, trees within 95 m as meshes and impostors beyond): p50 16.6–20.2 ms, worst p95 21.0 ms (spring pool), 50–60 fps, 58–172 draw calls, 0.5–1.9 M triangles. Low: 53–60 fps everywhere. The remaining Medium cost is fill (terrain splat, water, grass) at the pool; candidates for M4: cheaper water far from the camera, a lighter grass material, cascaded/tighter shadows. The RTX 4050 runs the smoke path at 60 fps (vsync).
 
+**M2 measurements (2026-09-11, same setup, `director off`):** the six M1 stations all at 60 fps (p95 17.2–17.5 ms, 58–168 draw calls, 0.5–1.9 M triangles). The new `party` station (six NPCs on the player bodies, ~23k triangles each with garments, plus the music and props) is the M2 worst case: p50 21.3 ms, p95 22.9 ms, 47 fps, 214 draw calls, 1.4 M triangles. NPCs currently have no level of detail and each garment is its own draw; the plan's "two levels of detail; animation throttled for distant NPCs" is half done (animation throttling beyond 45 m exists, LODs don't) and is the M4 performance pass's first target.
+
 ---
 
 ## 18. Code architecture
@@ -1328,6 +1342,7 @@ Commands:
 - `speed <x>` (game-time multiplier)
 - `stats` (frame-time/draw-call overlay)
 - `freecam`
+- M2 additions: `endevent`, `talk <npcId>` (spawns them beside you and opens the conversation), `director on|off|now`, `tutorial skip`, `grudge <npcId>`, `memory <npcId>`, `strip`, `damage <n>`, `bite`, `catch <…>`, `pos`. `window.__ss` also exposes `talk`, `choose`, `chooseText`, `advance`, `skipVignette`, `startEvent`, `endEvent`, `pickupAllCans`, `setSetting`, `dealTrade` for the smoke test.
 
 The console also exposes `window.__ss` hooks the smoke tests use. It's stripped from production builds.
 
@@ -1415,6 +1430,8 @@ Acceptance not fully met: **60 fps Medium on Iris Xe** — four of six stations 
 
 ### M2 — The interruptions
 
+**Status (2026-09-11): built; checkpoint in progress** — the owner's first play notes (§1 #32–35) are fixed and re-verified (typecheck, 66 tests, smoke). Evidence: `typecheck`, `test` (64 pass: sim suites for the Director, dialogue runner, trading, theft/abduction/health/memory, data integrity, save v2), `deps:check` (all ≥ 16 d), `build`, `simulate` (passes the three targets, §11.2), `npm run smoke -- --gpu` plays the M1 path and then forces every M2 event with zero console errors (34 screenshots in `smoke-out/`: visit + dialogue + trade, the pause toggle, the strip and the pity barrel, the party with 22 cans → zero bites → save/load mid-trash → collecting every can clears the water, the bear taking only the fish, Marina rising, the gator bite, Wade's grudge demand, the abduction returning within 0.1 m in a new outfit). `npm run perf -- --preset=medium` on the Intel Iris Xe at 1080p: the six M1 stations at 60 fps (p95 ≤ 17.5 ms); the new `party` station (six NPCs, music, props) at 47 fps / p95 22.9 ms, 214 draw calls, 1.4 M triangles — the M2 worst case and over budget (§17); NPC levels of detail and shared materials are the M4 fix. Every acceptance check below is exercised by the smoke test except *Buzzkill*, which needs a drawn weapon (M3). Known gaps carried: the ranger event and every `onThreatened` hook are M3 stubs; the bear is a placeholder until the owner downloads the Sketchfab model; no ambient passersby alongside an active event; NPCs keep their roster outfits (no wardrobe changes, as planned); the bundle copies all of `public/`; the Medium/Iris Xe budget holds at the six M1 stations and misses at the party station (§17).
+
 **Build**
 
 - **NPC framework:** character factory from roster data, NPC brain/state machine, trail-graph navigation + steering, look-at.
@@ -1490,13 +1507,17 @@ Resolve at the noted checkpoint, then move each into §1.
 2. ~~Setting~~ — resolved 2026-09-11: Southeastern springs (§1 #27).
 3. ~~Alligator model~~ — default kept: in-house (§1 #28); the owner can still swap in a sourced model later.
 4. **Recorded CC0 ambience** vs. synthesis-only. *M1 shipped synthesis only (river noise, wind, birds, frogs/crickets/owl, plucked score). Owner to judge at the M1 checkpoint.*
-5. **Pacing targets** after the first real play-test (events/hour, fish/hour). *M2.*
-6. **Alien interior vignette** — keep, shorten, or cut. *M2.*
-7. **Dialogue tone review** — any roster seeds to cut, change or add. *M2/M3.*
+5. **Pacing targets** after the first real play-test (events/hour, fish/hour). *M2 shipped the tunables listed in §11.2 "M2 implementation"; owner to judge at the M2 checkpoint.*
+6. **Alien interior vignette** — keep, shorten, or cut. *M2 shipped a three-question interview (skippable after the first abduction); owner to judge.*
+7. **Dialogue tone review** — any roster seeds to cut, change or add. *All 58 trees exist (`src/data/dialogue/`); owner to review at the M2 checkpoint.*
 
 **M0 checkpoint outcome (2026-09-11):** the owner picked A (MPFB2) and confirmed the setting; see §1 #25–28 for the feedback that shapes M1.
 
-**M1 checkpoint asks (2026-09-11):** (a) does the walk/jog/cast/reel animation now read as real motion on the MPFB bodies? (b) is the valley layout right (trailhead ridge → pool → three bridges → campground → beach → dock → marsh)? (c) underwear layer as specified? (d) synthesized audio acceptable or add CC0 recordings? (e) any art-direction notes before M2 fills the world with people.
+**M1 checkpoint outcome (2026-09-11):** passed (§1 #31). Answered in play: (a) animation reads as real motion (no further notes after the sprint lean fix); (b) layout accepted; (c) underwear layer accepted. Still open: (d) recorded ambience (item 4 above) and (e) art-direction notes — the owner can raise either at the M2 checkpoint.
+
+**M2 checkpoint asks (2026-09-11):** (a) pacing — do the interruptions feel relentless-but-fair? (`src/data/tunables.ts` → `director`, `events`, `serenity`; `npm run simulate` reports the effect); (b) dialogue tone — any roster seeds or lines to cut, change or add (§10.6); (c) the alien interior vignette (§22 #6): keep, shorten or cut; (d) recorded ambience (§22 #4) still open; (e) the bear: download the Sketchfab model (README "Asset pipeline") or keep the placeholder until M4.
+
+**M1 checkpoint asks (2026-09-11, kept for the record):** (a) does the walk/jog/cast/reel animation now read as real motion on the MPFB bodies? (b) is the valley layout right (trailhead ridge → pool → three bridges → campground → beach → dock → marsh)? (c) underwear layer as specified? (d) synthesized audio acceptable or add CC0 recordings? (e) any art-direction notes before M2 fills the world with people.
 
 ---
 

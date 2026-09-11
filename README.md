@@ -8,10 +8,14 @@ The design and build plan lives in [`plans/`](plans/); the current plan is the s
 
 ## Status
 
-M1 ("Tranquil" vertical slice) is built and awaiting the owner's checkpoint: a playable valley with
-the character creator, walking/jumping/wading, the full fishing loop, inventory and clothing, saves,
-menus and settings, and generative audio. The interruptions (NPCs, thieves, bear, alligator, UFO)
-arrive in M2. See the plan's milestone list (§20) for status and known gaps.
+M2 ("The interruptions") is built and awaiting the owner's checkpoint. On top of the M1 slice
+(the valley, the creator, the fishing loop, inventory and clothing, saves, menus, generative audio)
+the world now has people and problems: the 58-name roster with dialogue, trading and memory; the
+Annoyance Director (serenity, grace periods, pacing, lulls); camper and hiker visits; water-walkers;
+thieves (with the strip and the pity barrel); parties that trash a zone (brown grass, cans,
+beer-coloured water); the bear; the alligator; UFO abductions; grudge returns; health and death; the
+tutorial narrator. Weapons, the ranger and the boat arrive in M3. See the plan's milestone list (§20)
+for status and known gaps.
 
 ## Running it
 
@@ -27,9 +31,12 @@ npm run dev          # Vite dev server → http://localhost:5173/  (the game is 
 
 Controls (rebindable in **Controls**): W A S D move, mouse look, Space jump, Shift sprint,
 **right mouse** hold to charge a cast / release to cast / press to reel, F interact, E inventory,
-Q drop, 1–9 or wheel hotbar, V camera distance, J journal, Esc pause. Dev builds open the debug
-console with `` ` `` (`help` lists commands: `time`, `day`, `give`, `outfit`, `tp`, `trash`,
-`speed`, `bite`, `catch`, `stats`, …).
+Q drop, 1–9 or wheel hotbar, V camera distance, J journal, Esc pause. In the inventory: click an
+item, then click where it goes (or drag), shift-click splits, double-click equips or uses. In a
+conversation: click or Space continues, 1–4 pick a choice, Esc leaves. Dev builds open the debug console with `` ` ``
+(`help` lists commands: `event <type> [npc]`, `npc <id>`, `talk <id>`, `endevent`, `lull`,
+`director on|off|now`, `tutorial skip`, `grudge <id>`, `time`, `day`, `give`, `outfit`, `strip`,
+`tp`, `trash`, `damage`, `heal`, `kill`, `speed`, `bite`, `catch`, `stats`, …).
 
 Lab pages (look-dev, not part of the game) are indexed at `lab/index.html`: the character bake-off
 and the M1 player bodies (`lab/characters.html`), the animation flip-books (`?shot=anim&clip=…`),
@@ -42,7 +49,8 @@ npm run typecheck    # strict TypeScript
 npm test             # node --test suites in tests/ (sim, saves, terrain)
 npm run deps:check   # every resolved package version is ≥ 14 days old
 npm run build        # production build into dist/
-npm run smoke        # headless Chromium over CDP plays the M1 acceptance path; fails on console errors
+npm run smoke        # headless Chromium over CDP plays the M1 path, then forces every M2 event; fails on console errors
+npm run simulate     # Director + fishing Monte Carlo report against the pacing targets (fails if one is missed)
 npm run shots        # look-dev screenshot sets into shots-out/ (--set=…, --gpu for the real GPU)
 npm run perf         # frame times per graphics preset on the real GPU (--preset=medium,high)
 ```
@@ -57,7 +65,14 @@ npm run perf         # frame times per graphics preset on the real GPU (--preset
   `public/assets/built/characters/mpfb/`.
 - Animations: the CC0 Quaternius Universal Animation Library clips are retargeted onto the MPFB rig
   by `assets-src/characters/blender/retarget.py` (`animations.json`), together with hand-authored
-  fishing clips (`poses.json`), into one shared library GLB.
+  fishing clips (`poses.json`), into one shared library GLB. NPCs reuse the two player bodies (their
+  looks are data in `src/data/npcs.ts`), so no per-NPC bake is needed.
+- The bear is an in-house placeholder until the owner downloads the Sketchfab "Animated Bear"
+  (CC-BY 4.0, login required). To use it: put the glTF at
+  `public/assets/fetched/models/animated_bear/scene.gltf` (or `scene.glb`, textures alongside) and
+  add a `manual` entry with id `model-bear` to `assets-src/assets.json` so `ASSETS.md` carries the
+  attribution; `src/actors/bear.ts` loads that path when it exists and recolours it toward a black
+  bear.
 - Trees are generated at load time with EZ-Tree; the valley terrain is procedural from
   `src/world/valley.ts` and the layout data in `src/data/world.ts`.
 

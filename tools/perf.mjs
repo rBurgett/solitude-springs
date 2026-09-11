@@ -2,6 +2,7 @@
 // flythrough + walk across the map and reports p50/p95 frame time, draw calls and triangles per
 // preset, plus the GPU the browser actually used (hybrid laptops: check it's the one you meant).
 //   node tools/perf.mjs [--preset=medium,high] [--base=http://localhost:5173] [--out=perf-out] [--headed]
+// The `party` station forces a party (6 NPCs, music, props) at Sandy Bend: the M2 worst case.
 import path from 'node:path';
 import { mkdir, writeFile } from 'node:fs/promises';
 import { launchChromium, startDevServer, parseArgs, reportConsole, ROOT, sleep } from './cdp.mjs';
@@ -24,6 +25,7 @@ const STATIONS = [
   { name: 'plank_bridge', tp: 'plank_bridge', yaw: 0.0 },
   { name: 'deep_woods', tp: 'deep_woods', yaw: 1.2 },
   { name: 'marsh', tp: 'marsh', yaw: 3.1 },
+  { name: 'party', tp: 'sandy_bend', yaw: 1.2, event: 'party' },
 ];
 
 async function measure(seconds = 3000) {
@@ -47,6 +49,7 @@ try {
       await ev('window.__app.quickStart("Perf")');
       await browser.waitFor('!!window.__ss', 240_000);
       await ev('window.__ss.hideClickToPlay()');
+      await ev('window.__ss.run("director off")');
     }
     await sleep(1500);
     const perStation = [];
@@ -54,6 +57,16 @@ try {
       await ev(`window.__ss.run(${JSON.stringify('tp ' + st.tp)})`);
       await ev(`window.__ss.setYaw(${st.yaw}, 0.15)`);
       await sleep(800);
+      if (st.event) {
+        await ev(`window.__ss.run(${JSON.stringify('event ' + st.event)})`);
+        const t0 = Date.now();
+        while (Date.now() - t0 < 90_000) {
+          const e = await ev('window.__ss.state().event');
+          if (e && e.phase === 'party') break;
+          await sleep(500);
+        }
+        await sleep(1500);
+      }
       // walk a bit so vegetation refills and animation runs
       await ev('window.__ss.key("forward", true)');
       await sleep(1500);
@@ -62,6 +75,7 @@ try {
       perStation.push({ station: st.name, ...m });
       console.log(`  [${preset}] ${st.name.padEnd(13)} p50 ${m.p50.toFixed(1)} ms  p95 ${m.p95.toFixed(1)} ms  mean ${m.mean.toFixed(1)} ms (${(1000 / m.mean).toFixed(0)} fps)  draws ${m.draws}  tris ${m.tris.toLocaleString()}`);
       await browser.screenshot(path.join(OUT, `${preset}-${st.name}.png`));
+      if (st.event) await ev('window.__ss.endEvent()');
     }
     const p95 = Math.max(...perStation.map((s) => s.p95));
     const p50 = perStation.reduce((a, s) => a + s.p50, 0) / perStation.length;

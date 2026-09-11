@@ -1,5 +1,6 @@
-// One game session (plan §18): owns the sim state, the player, fishing, pickups, HUD, overlays,
-// saving. The World is built once by the app and shared with the main-menu flyover.
+// One game session (plan §18): owns the sim state, the player, fishing, pickups, NPCs, the
+// Director and its events, conversations and trading, HUD, overlays, saving. The World is built
+// once by the app and shared with the main-menu flyover.
 import * as THREE from 'three';
 import type { World } from './world/world.ts';
 import type { RendererBundle } from './render/renderer.ts';
@@ -7,6 +8,12 @@ import { Player } from './actors/player.ts';
 import { ThirdPersonCamera } from './actors/camera.ts';
 import { FishingSystem, type FishingHost } from './gameplay/fishing.ts';
 import { PickupSystem } from './gameplay/pickups.ts';
+import { NpcManager } from './gameplay/npcs.ts';
+import type { Npc } from './actors/npc.ts';
+import { Conversation, type ConversationHost } from './gameplay/conversation.ts';
+import { createRunner, ThiefRunner, GrudgeRunner } from './gameplay/events/index.ts';
+import type { EventHost, EventRunner } from './gameplay/events/host.ts';
+import { Tutorial } from './gameplay/tutorial.ts';
 import { Hud } from './ui/hud.ts';
 import { DevConsole } from './ui/console.ts';
 import { inventoryScreen } from './ui/screens/inventory.ts';
@@ -14,7 +21,9 @@ import { journalScreen } from './ui/screens/journal.ts';
 import { pauseScreen } from './ui/screens/pause.ts';
 import { settingsScreen } from './ui/screens/settings.ts';
 import { controlsScreen } from './ui/screens/controls.ts';
+import { tradeScreen } from './ui/screens/trade.ts';
 import { CharacterPreview } from './ui/preview.ts';
+import { renderPortrait } from './ui/portrait.ts';
 import { Input } from './input/input.ts';
 import type { BindingsStore } from './input/bindings.ts';
 import type { SettingsStore } from './core/settings.ts';
@@ -26,14 +35,17 @@ import { TUNABLES } from './data/tunables.ts';
 import { ZONES, SPAWN } from './data/world.ts';
 import { itemDef, isKnownItem } from './data/items.ts';
 import { ACHIEVEMENT_BY_ID } from './data/achievements.ts';
-import { fishDef } from './data/fish.ts';
-import { createClock, advanceClock, phaseOf, formatClock, setClockTime, cycleFraction, type ClockState } from './sim/clock.ts';
-import { createZoneState, recoverZone, onCatch as zoneOnCatch, onCanPickedUp, type ZoneState } from './sim/zones.ts';
-import { createInventory, addItem, takeSlot, selectedStack, selectSlot, outfitOf, removeItem, equipFromSlot, removeAllFish, hasItem, type InventoryState } from './sim/inventory.ts';
-import { createJournal, createStats, recordCatch, type JournalState, type StatsState } from './sim/journal.ts';
+import { fishDef, FISH_BY_ID } from './data/fish.ts';
+import { NPCS, npcDef, isKnownNpc, type NpcDef } from './data/npcs.ts';
+import { EVENT_BY_TYPE, isEventType, type EventType } from './data/events.ts';
+import { dialogueFor } from './data/dialogue/index.ts';
+import { SHARED_BARKS, DEFAULT_EVENT_LINES, type BarkCategory, type DialogueTree, type DialogueEffect, type EventLines } from './data/dialogue.ts';
+import { createClock, advanceClock, phaseOf, formatClock, setClockTime, cycleFraction, SECONDS_PER_GAME_HOUR, type ClockState } from './sim/clock.ts';
+import { createZoneState, recoverZone, onCatch as zoneOnCatch, onCanPickedUp, isTrashed, type ZoneState } from './sim/zones.ts';
+import { createInventory, addItem, takeSlot, selectedStack, selectSlot, outfitOf, removeItem, equipFromSlot, removeAllFish, hasItem, countItem, type InventoryState, type ItemStack } from './sim/inventory.ts';
+import { createJournal, createStats, recordCatch, recordPerson, type JournalState, type StatsState } from './sim/journal.ts';
 import { checkAchievements } from './sim/achievements.ts';
 import { rollFish, rollJunk, rollClothing, rollWeight, biteWindowFor, type CatchContext, type CatchResult } from './sim/catchTable.ts';
-import { FISH_BY_ID } from './data/fish.ts';
 import type { FishingEvent } from './sim/fishing.ts';
 import { SCHEMA_VERSION, type CharacterRecord, type SaveRecord } from './sim/save/schema.ts';
 import { formatWeight } from './sim/save/format.ts';
@@ -41,7 +53,13 @@ import { lookFromRecord, defaultOutfitFor } from './ui/screens/creator.ts';
 import type { AudioEngine } from './audio/engine.ts';
 import { Music } from './audio/music.ts';
 import { Ambience } from './audio/ambience.ts';
+import { Voice } from './audio/voices.ts';
 import { el } from './ui/el.ts';
+import { createMemory, markMet, adjustRelationship, grudgeReady, isOutOfPool, hasStolenLoot, type NpcMemory } from './sim/npcMemory.ts';
+import { createDirector, fromDirectorSave, toDirectorSave, tickDirector, onEventStarted, onEventEnded, serenityTick, serenityAfterEvent, serenityAfterHurt, recentEvent, decayWanted, pickNpcs, type DirectorState, type Situation } from './sim/director.ts';
+import { createHealth, damage as applyDamage, heal as applyHeal, tickHealth, respawn, type HealthState } from './sim/health.ts';
+import type { DialogueContext } from './sim/dialogue.ts';
+import { evaluateTrade, isJunkForTreasure } from './sim/trading.ts';
 
 export interface GameHost {
   world: World;
@@ -56,7 +74,10 @@ export interface GameHost {
 
 export type GameSource = { character: CharacterRecord } | { save: SaveRecord };
 
-type Overlay = 'none' | 'pause' | 'inventory' | 'journal' | 'settings' | 'controls';
+type Overlay = 'none' | 'pause' | 'inventory' | 'journal' | 'settings' | 'controls' | 'dialogue' | 'trade';
+
+const BARK_ORDER: BarkCategory[] = ['barrel', 'underwear', 'manInDress', 'womanInTuxedo', 'tinfoil', 'abducted', 'oldGus', 'wading', 'trashed', 'weapon'];
+const DRESSES = new Set(['short_dress', 'sundress', 'ball_gown']);
 
 export class Game {
   readonly world: World;
@@ -64,11 +85,13 @@ export class Game {
   readonly camera: ThirdPersonCamera;
   readonly fishing: FishingSystem;
   readonly pickups: PickupSystem;
+  readonly npcs: NpcManager;
   readonly hud: Hud;
   readonly bus = new EventBus();
   readonly loop: GameLoop;
   readonly input: Input;
   readonly console: DevConsole;
+  readonly conversation: Conversation;
   // sim state
   readonly character: CharacterRecord;
   readonly inventory: InventoryState;
@@ -77,13 +100,19 @@ export class Game {
   readonly journal: JournalState;
   readonly stats: StatsState;
   readonly achievements: Record<string, string>;
+  readonly memories: Record<string, NpcMemory>;
+  readonly health: HealthState;
+  director: DirectorState;
   serenity: number;
-  health: number;
   rng: Rng;
   saveId: string;
   createdAt: string;
   playTime: number;
-  director = { wanted: 0, ufoRecentUntil: 0, lull: false };
+  /** The Director can be switched off (console `director off`, the M1 smoke path). */
+  directorEnabled = true;
+  activeEvent: EventRunner | null = null;
+  private eventStarting = false;
+  private tutorial: Tutorial | null = null;
   private host: GameHost;
   private elapsed = 0;
   private overlay: Overlay = 'none';
@@ -96,10 +125,19 @@ export class Game {
   private lastFootstepAt = 0;
   private music: Music | null = null;
   private ambience: Ambience | null = null;
-  private graceUntil = 0;
+  private ambienceMuted = false;
   private statsOverlay: HTMLElement | null = null;
   private tmp = new THREE.Vector3();
   private disposed = false;
+  private trashPainted = new Map<string, number>();
+  private trashRepaint = 0;
+  /** Zones a party (or the console) trashed and nobody has cleaned yet: collecting every can there clears the water (§11.4). */
+  private dirtyZones = new Set<string>();
+  private lastDay = 1;
+  private talkingWith: Npc | null = null;
+  private tradeResolve: (() => void) | null = null;
+  private bubblePositions = new Map<string, { x: number; y: number } | null>();
+  private eventHost: EventHost;
 
   private constructor(host: GameHost, player: Player, source: GameSource) {
     this.host = host;
@@ -108,6 +146,7 @@ export class Game {
     const canvas = host.gl.renderer.domElement;
     this.camera = new ThirdPersonCamera(canvas.clientWidth / Math.max(1, canvas.clientHeight), host.settings.get().graphics.fov);
     this.camera.yaw = player.yaw + Math.PI;
+    const rngFn = (): number => this.rng.next();
     // state
     if ('save' in source) {
       const s = source.save;
@@ -118,62 +157,73 @@ export class Game {
       this.stats = s.progress.stats;
       this.achievements = { ...s.progress.achievements };
       this.serenity = s.progress.serenity;
-      this.health = s.player.health;
+      this.health = createHealth(s.player.health);
       this.rng = new Rng(s.rng.seed);
       this.rng.setState(s.rng.state);
       this.saveId = s.id;
       this.createdAt = s.createdAt;
       this.playTime = s.playTimeSeconds;
-      this.director = { ...s.director };
+      this.memories = s.npcs;
+      this.director = fromDirectorSave(s.director, rngFn);
       for (const z of ZONES) {
         const zs = createZoneState(z);
         const saved = s.world.zones[z.id];
         if (saved) {
           zs.population = saved.population;
           zs.trash = saved.trash;
+          if (saved.trash > 0.005) {
+            this.world.setZoneTrash(z.id, saved.trash, saved.trashCenter);
+            this.trashPainted.set(z.id, saved.trash);
+            this.dirtyZones.add(z.id);
+          }
         }
         this.zones.set(z.id, zs);
       }
-      this.graceUntil = TUNABLES.save.graceSecondsAfterLoad;
     } else {
       this.character = source.character;
       this.inventory = createInventory();
       addItem(this.inventory, { id: 'old_rod', count: 1 });
       const outfit = defaultOutfitFor(this.character.sex);
-      for (const [slot, garment] of Object.entries(outfit)) {
+      for (const garment of Object.values(outfit)) {
         const color = this.character.outfitColors[garment];
         addItem(this.inventory, { id: garment, count: 1, ...(color ? { color } : {}) });
         const idx = this.inventory.slots.findIndex((x) => x?.id === garment);
         equipFromSlot(this.inventory, idx);
-        void slot;
       }
       this.clock = createClock();
       this.journal = createJournal();
       this.stats = createStats();
       this.achievements = {};
       this.serenity = TUNABLES.serenity.start;
-      this.health = TUNABLES.health.maxHearts;
+      this.health = createHealth();
       this.rng = new Rng(randomSeed());
       this.saveId = randomId();
       this.createdAt = new Date().toISOString();
       this.playTime = 0;
+      this.memories = {};
+      this.director = createDirector(true, rngFn);
       for (const z of ZONES) this.zones.set(z.id, createZoneState(z));
+      this.tutorial = new Tutorial({ narrate: (t) => this.hud.narrate(t), interrupt: () => void this.startEvent('thief', 'pete', { scripted: true }), sessionSeconds: () => this.director.sessionSeconds });
     }
+    this.lastDay = this.clock.day;
     this.hud = new Hud(host.ui);
     this.pickups = new PickupSystem(this.world);
     if ('save' in source) this.pickups.restore(source.save.world.pickups);
+    this.npcs = new NpcManager(this.world);
     this.fishing = new FishingSystem(this.world, player, this.fishingHost());
     this.input = new Input(canvas, host.bindings, { onCaptureLost: () => this.onCaptureLost() });
     this.console = new DevConsole(host.ui, this.commands());
     this.console.onToggle = (open) => {
       this.input.suspended = open || this.overlay !== 'none';
     };
+    this.conversation = new Conversation(host.ui, this.conversationHost());
     if (host.audio) {
-      this.music = new Music(host.audio, () => this.rng.next());
-      this.ambience = new Ambience(host.audio, () => this.rng.next());
+      this.music = new Music(host.audio, rngFn);
+      this.ambience = new Ambience(host.audio, rngFn);
       this.music.start();
       this.ambience.start();
     }
+    this.eventHost = this.makeEventHost();
     this.loop = new GameLoop({ step: (dt) => this.step(dt), render: (dt) => this.render(dt) }, 30);
     this.applyWornOutfit();
     this.updateRodSelection();
@@ -193,7 +243,7 @@ export class Game {
   static async create(host: GameHost, source: GameSource): Promise<Game> {
     const progress = host.onProgress ?? (() => {});
     const character = 'save' in source ? source.save.character : source.character;
-    progress('Waking up the angler', 0.2);
+    progress('Waking up the angler', 0.15);
     const look = lookFromRecord(character);
     let outfit = defaultOutfitFor(character.sex);
     if ('save' in source) {
@@ -208,6 +258,8 @@ export class Game {
       onBoundary: () => game?.onBoundary(),
       onTooDeep: () => game?.onTooDeep(),
     });
+    progress('Inviting the neighbours', 0.6);
+    await NpcManager.preload();
     progress('Ready', 1);
     game = new Game(host, player, source);
     return game;
@@ -220,10 +272,7 @@ export class Game {
     this.input.capture();
     const area = this.world.areaAt(this.player.feet.x, this.player.feet.z);
     if (area) this.hud.showArea(area.name);
-    if (this.playTime < 1) {
-      this.hud.toast('Breathe in… cast your line…');
-      this.hud.caption('Right mouse: hold to charge a cast, release to cast, press again to reel.');
-    }
+    if (this.playTime < 1) this.hud.caption('Right mouse: hold to charge a cast, release to cast, press again to reel.');
   }
 
   private onResize = (): void => {
@@ -252,16 +301,21 @@ export class Game {
     this.loop.stop();
     this.input.release();
     this.input.dispose();
+    this.endEvent(true);
+    this.conversation.dispose();
     this.closeOverlay();
     this.hud.dispose();
     this.console.root.remove();
     this.fishing.dispose();
     this.pickups.clear();
+    this.npcs.despawnAll();
     this.player.dispose();
     this.music?.stop();
     this.ambience?.stop();
     this.statsOverlay?.remove();
     this.previewForInventory?.dispose();
+    this.world.lightFlicker = 0;
+    for (const z of ZONES) this.world.setZoneTrash(z.id, 0);
     window.removeEventListener('resize', this.onResize);
     window.removeEventListener('beforeunload', this.onUnload);
     document.removeEventListener('visibilitychange', this.onVisibility);
@@ -273,10 +327,10 @@ export class Game {
     const inp = this.input;
     this.elapsed += dt;
     this.playTime += dt;
-    if (this.graceUntil > 0) this.graceUntil -= dt;
-    // Esc: fixed pause (also handles closing overlays)
+    // Esc: fixed pause (also closes overlays and conversations)
     if (inp.pressedCode('Escape')) {
-      if (this.overlay !== 'none') this.closeOverlay();
+      if (this.overlay === 'dialogue' || this.overlay === 'trade') this.conversation.close('escaped');
+      else if (this.overlay !== 'none') this.closeOverlay();
       else this.openOverlay('pause');
     }
     if (this.overlay === 'none' && !this.console.open) {
@@ -285,6 +339,10 @@ export class Game {
       else if (inp.pressed('console') && import.meta.env.DEV) this.console.toggle(true);
     } else if (this.overlay === 'inventory' && inp.pressedCode(this.host.bindings.get().inventory.primary ?? 'KeyE')) this.closeOverlay();
     else if (this.overlay === 'journal' && inp.pressedCode(this.host.bindings.get().journal.primary ?? 'KeyJ')) this.closeOverlay();
+    else if (this.overlay === 'dialogue' && !this.console.open) {
+      if (inp.pressedCode('Space') || inp.pressedCode('Enter')) this.conversation.advance();
+      for (let i = 0; i < 4; i++) if (inp.pressedCode(`Digit${i + 1}`)) this.conversation.pressChoice(i);
+    }
     const menuPaused = this.overlay === 'pause' || this.overlay === 'settings' || this.overlay === 'controls';
     if (menuPaused) {
       inp.endStep();
@@ -312,9 +370,12 @@ export class Game {
     // movement
     const intent = { x: (inp.held('right') ? 1 : 0) - (inp.held('left') ? 1 : 0), z: (inp.held('forward') ? 1 : 0) - (inp.held('back') ? 1 : 0), sprint: inp.held('sprint'), jump: inp.pressed('jump') };
     const wasGrounded = this.player.grounded;
-    this.player.step(dt, intent, this.camera.basis(), this.elapsed);
-    if (intent.jump && wasGrounded && this.player.grounded === false) this.host.audio?.jump();
-    if (!wasGrounded && this.player.grounded && this.player.airTime === 0) this.host.audio?.land();
+    if (!this.player.frozen) {
+      this.player.step(dt, intent, this.camera.basis(), this.elapsed);
+      if (intent.jump && wasGrounded && this.player.grounded === false) this.host.audio?.jump();
+      if (!wasGrounded && this.player.grounded && this.player.airTime === 0) this.host.audio?.land();
+    }
+    this.npcs.step(dt);
     this.world.physics.step();
     this.footsteps();
     this.fishing.step(dt);
@@ -322,6 +383,11 @@ export class Game {
     // clock and zones
     const hours = advanceClock(this.clock, dt);
     for (const z of this.zones.values()) recoverZone(z, hours);
+    this.trashRepaint += dt;
+    if (this.trashRepaint > 2) {
+      this.trashRepaint = 0;
+      this.repaintTrash();
+    }
     const phase = phaseOf(this.clock);
     if (phase !== this.lastPhase) {
       const prev = this.lastPhase;
@@ -330,11 +396,23 @@ export class Game {
       this.music?.setNight(phase === 'night');
       if (prev === 'night' && phase === 'dawn') this.bus.emit('dayChanged', { day: this.clock.day });
     }
-    // serenity (M1: passive calm)
-    this.serenity = Math.min(1, this.serenity + (TUNABLES.serenity.regenPerMinute / 60) * dt);
-    if (this.serenity >= TUNABLES.legend.serenityRequired) this.calmSeconds += dt;
-    else this.calmSeconds = 0;
-    if (this.serenity >= 1 && !this.achievements.actual_solitude) this.unlockChecks();
+    if (this.clock.day !== this.lastDay) {
+      decayWanted(this.director, this.clock.day - this.lastDay);
+      this.lastDay = this.clock.day;
+    }
+    // health
+    const wasAlive = this.health.hearts > 0;
+    tickHealth(this.health, dt);
+    if (wasAlive && this.health.hearts <= 0) this.die();
+    // the Director: serenity, pacing, events (§11)
+    this.tickDirector(dt);
+    // the active event (not while its async start is still spawning things)
+    if (this.activeEvent && !this.eventStarting) {
+      this.activeEvent.step(dt);
+      if (this.activeEvent.done) this.endEvent(false);
+    }
+    this.tutorial?.step();
+    if (this.tutorial?.done) this.tutorial = null;
     // area banner
     const area = this.world.areaAt(this.player.feet.x, this.player.feet.z);
     if (area) this.hud.showArea(area.name);
@@ -345,6 +423,53 @@ export class Game {
       void this.save('autosave');
     }
     inp.endStep();
+  }
+
+  private tickDirector(dt: number): void {
+    const d = this.director;
+    const quiet = !this.activeEvent && !this.npcs.anyWithin(this.player.feet, TUNABLES.serenity.quietRadius);
+    const before = this.serenity;
+    this.serenity = serenityTick(this.serenity, dt, quiet);
+    if (this.serenity >= TUNABLES.legend.serenityRequired) this.calmSeconds += dt;
+    else this.calmSeconds = 0;
+    if (this.serenity >= 1 && this.calmSeconds >= TUNABLES.legend.calmSecondsRequired && !this.achievements.actual_solitude) this.unlockChecks();
+    void before;
+    if (!this.directorEnabled) {
+      d.sessionSeconds += dt;
+      return;
+    }
+    const intent = tickDirector(d, dt, this.situation(), this.clock.day, cycleFraction(this.clock), () => this.rng.next());
+    if (intent.lullStarted) this.bus.emit('lull', { started: true });
+    if (intent.lullEnded) this.bus.emit('lull', { started: false });
+    if (intent.startEvent && !this.activeEvent && !this.eventStarting) void this.startEvent(intent.startEvent);
+  }
+
+  private situation(): Situation {
+    const p = this.player.feet;
+    const v = this.world.valley;
+    const zone = v.zoneAt(p.x, p.z) ?? (v.edgeDistance(p.x, p.z) < 16 ? v.zoneForZ(p.z) : null);
+    const day = this.clock.day;
+    return {
+      phase: phaseOf(this.clock), now: this.now(), areaId: this.world.areaAt(p.x, p.z)?.id ?? null, waterDistance: Math.max(0, v.edgeDistance(p.x, p.z)), waterKind: zone?.water ?? null,
+      hasFish: this.inventory.slots.some((s) => s && itemDef(s.id).kind === 'fish'), inBoat: false, underBridge: v.edgeDistance(p.x, p.z) < 0 && p.y < 0.5 && this.world.groundAt(p.x, p.z + 0, p.y + 4) > p.y + 1,
+      saveMinutes: this.playTime / 60, lineOut: this.fishing.lineOut, grudgeReady: NPCS.some((n) => this.memories[n.id] && grudgeReady(this.memories[n.id]!, day)), wadingMarshNight: this.player.depth > 0.05 && zone?.water === 'marsh' && phaseOf(this.clock) === 'night',
+    };
+  }
+
+  now(): number {
+    return this.clock.day + cycleFraction(this.clock);
+  }
+
+  private repaintTrash(): void {
+    for (const [id, z] of this.zones) {
+      const painted = this.trashPainted.get(id) ?? 0;
+      if (Math.abs(z.trash - painted) > 0.01) {
+        this.world.setZoneTrash(id, z.trash);
+        this.trashPainted.set(id, z.trash);
+      }
+      // fully recovered on its own with no cans left: nothing to clean any more
+      if (z.trash <= 0 && this.dirtyZones.has(id) && this.canPickupIds(id).length === 0) this.dirtyZones.delete(id);
+    }
   }
 
   private render(dt: number): void {
@@ -358,7 +483,10 @@ export class Game {
     if (!paused) {
       this.player.render(dt);
       this.fishing.render();
+      this.npcs.render(dt, this.camera.camera.position);
+      if (!this.eventStarting) this.activeEvent?.render(dt);
     }
+    this.conversation.update(dt);
     this.camera.update(dt, this.player.feet, this.world.physics, (x, z) => this.world.heightAt(x, z), this.player.body.collider);
     const camPos = this.camera.camera.position;
     this.world.applyClock(this.clock, this.player.feet);
@@ -370,25 +498,50 @@ export class Game {
       const f = cycleFraction(this.clock);
       const C = TUNABLES.clock;
       const nightW = f > (C.dawnSeconds + C.daySeconds + C.duskSeconds) / C.dayLengthSeconds ? 1 : f < C.dawnSeconds / C.dayLengthSeconds ? 0.5 : 0;
-      this.ambience.update(Math.max(0, this.world.valley.edgeDistance(this.player.feet.x, this.player.feet.z)), nightW, this.world.valley.forestAt(this.player.feet.x, this.player.feet.z));
+      this.ambience.update(Math.max(0, this.world.valley.edgeDistance(this.player.feet.x, this.player.feet.z)), this.ambienceMuted ? 2 : nightW, this.ambienceMuted ? 0 : this.world.valley.forestAt(this.player.feet.x, this.player.feet.z));
     }
     // HUD
     const near = this.pickups.nearest(this.player.feet);
+    const npc = this.overlay === 'none' ? this.npcs.nearestTalkable(this.player.feet) : null;
     let prompt: string | null = null;
-    if (near) prompt = `F — Pick up ${itemDef(near.itemId).name}${near.count > 1 ? ` ×${near.count}` : ''}`;
+    if (npc) prompt = `F — Talk to ${npc.def.name}`;
+    else if (near) prompt = `F — Pick up ${itemDef(near.itemId).name}${near.count > 1 ? ` ×${near.count}` : ''}`;
     this.hud.update(
       {
-        hearts: this.health, maxHearts: TUNABLES.health.maxHearts, serenity: this.serenity, clockText: formatClock(this.clock), day: this.clock.day,
+        hearts: this.health.hearts, maxHearts: TUNABLES.health.maxHearts, serenity: this.serenity, clockText: formatClock(this.clock), day: this.clock.day,
         hotbar: this.inventory.slots.slice(0, 9), selected: this.inventory.selected, prompt, castCharge: this.fishing.state.phase === 'charging' ? this.fishing.state.charge : null,
         bite: this.fishing.state.phase === 'bite', lineOut: this.fishing.lineOut, captured: this.input.isCaptured || this.overlay !== 'none', biteIndicator: this.host.settings.get().gameplay.biteIndicator, saving: this.saving,
       },
       dt,
     );
+    this.placeBubbles();
     if (this.statsOverlay) {
       const s = this.loop.stats();
       const info = this.host.gl.renderer.info.render;
-      this.statsOverlay.textContent = `fps ${s.fps.toFixed(0)}  p50 ${s.p50.toFixed(1)} ms  p95 ${s.p95.toFixed(1)} ms\ndraws ${info.calls}  tris ${info.triangles.toLocaleString()}\npos ${this.player.feet.x.toFixed(1)}, ${this.player.feet.y.toFixed(1)}, ${this.player.feet.z.toFixed(1)}  zone ${this.world.zoneAt(this.player.feet.x, this.player.feet.z)?.id ?? '-'}`;
+      this.statsOverlay.textContent = `fps ${s.fps.toFixed(0)}  p50 ${s.p50.toFixed(1)} ms  p95 ${s.p95.toFixed(1)} ms\ndraws ${info.calls}  tris ${info.triangles.toLocaleString()}\npos ${this.player.feet.x.toFixed(1)}, ${this.player.feet.y.toFixed(1)}, ${this.player.feet.z.toFixed(1)}  zone ${this.world.zoneAt(this.player.feet.x, this.player.feet.z)?.id ?? '-'}\nevent ${this.activeEvent ? `${this.activeEvent.type}/${this.activeEvent.phase}` : '-'}  npcs ${this.npcs.count}  next ${(this.director.nextEventAt - this.director.sessionSeconds).toFixed(0)}s${this.director.lull ? ' (lull)' : ''}`;
     }
+  }
+
+  /** Project a world point to HUD pixels (null when behind the camera). */
+  private project(p: THREE.Vector3): { x: number; y: number } | null {
+    const v = this.tmp.copy(p).project(this.camera.camera);
+    if (v.z > 1 || v.z < -1) return null;
+    const c = this.host.gl.renderer.domElement;
+    return { x: ((v.x + 1) / 2) * c.clientWidth, y: ((1 - v.y) / 2) * c.clientHeight };
+  }
+
+  private placeBubbles(): void {
+    this.bubblePositions.clear();
+    for (const n of this.npcs.active.values()) {
+      const head = new THREE.Vector3(n.feet.x, n.feet.y + 2.0 * n.def.look.scale, n.feet.z);
+      this.bubblePositions.set(n.def.id, this.project(head));
+    }
+    this.hud.placeBubbles(this.bubblePositions);
+    const ring = this.activeEvent instanceof ThiefRunner || this.activeEvent instanceof GrudgeRunner ? this.activeEvent.ringState() : null;
+    if (ring) {
+      const p = this.project(ring.pos);
+      this.hud.setRing(p ? { ...p, t: ring.t } : null);
+    } else this.hud.setRing(null);
   }
 
   private footsteps(): void {
@@ -421,7 +574,7 @@ export class Game {
     this.fishing.setRodOut(rod);
   }
 
-  private applyWornOutfit(): void {
+  applyWornOutfit(): void {
     const o = outfitOf(this.inventory);
     this.player.character.setOutfit({ top: o.garments.top, bottom: o.garments.bottom, full: o.garments.full, shoes: o.garments.shoes, hat: o.garments.hat });
     for (const [g, c] of Object.entries(o.colors)) this.player.character.setGarmentColor(g, c);
@@ -430,7 +583,7 @@ export class Game {
   }
 
   /** Add to the inventory or drop at the feet when full (§8.1). */
-  private give(itemId: string, count: number, color?: string): boolean {
+  give(itemId: string, count: number, color?: string): boolean {
     const r = addItem(this.inventory, { id: itemId, count, ...(color ? { color } : {}) });
     if (r.leftover > 0) {
       const f = this.player.feet;
@@ -452,9 +605,18 @@ export class Game {
   }
 
   private interact(): void {
+    const npc = this.npcs.nearestTalkable(this.player.feet);
+    if (npc) {
+      void this.talkTo(npc);
+      return;
+    }
     const near = this.pickups.nearest(this.player.feet);
     if (!near) return;
-    const rec = this.pickups.take(near.id);
+    this.pickUp(near.id);
+  }
+
+  private pickUp(pickupId: string): void {
+    const rec = this.pickups.take(pickupId);
     if (!rec) return;
     const r = addItem(this.inventory, { id: rec.itemId, count: rec.count, ...(rec.color ? { color: rec.color } : {}) });
     if (r.leftover > 0) {
@@ -465,8 +627,12 @@ export class Game {
       const def = itemDef(rec.itemId);
       if (def.kind === 'can') {
         this.stats.cansCollected += r.added;
-        const zone = this.world.zoneAt(rec.position[0], rec.position[2]);
-        if (zone) onCanPickedUp(this.zones.get(zone.id)!, hasItem(this.inventory, 'trash_bag'));
+        const zone = this.world.valley.zoneForZ(rec.position[2]);
+        if (zone) {
+          const zs = this.zones.get(zone.id)!;
+          onCanPickedUp(zs, hasItem(this.inventory, 'trash_bag'));
+          this.checkZoneCleaned(zone.id, zs);
+        }
         this.host.audio?.canCrunch();
       } else this.host.audio?.pickup();
       this.bus.emit('itemPickedUp', { itemId: rec.itemId, count: r.added });
@@ -475,24 +641,458 @@ export class Game {
     }
   }
 
+  /** Collecting every can from a trashed zone clears the water (§11.4 "Recovery", achievement Leave No Trace). */
+  private checkZoneCleaned(zoneId: string, zs: ZoneState): void {
+    if (!this.dirtyZones.has(zoneId)) return;
+    if (this.canPickupIds(zoneId).length > 0) return;
+    this.dirtyZones.delete(zoneId);
+    zs.trash = 0;
+    this.world.setZoneTrash(zoneId, 0);
+    this.trashPainted.set(zoneId, 0);
+    this.stats.zonesCleaned++;
+    this.hud.toast('Every can is gone. The water clears.', 'achievement');
+    this.bus.emit('zoneCleaned', { zoneId });
+    this.unlockChecks();
+  }
+
   private useConsumable(index: number): void {
     const s = this.inventory.slots[index];
     if (!s) return;
     const def = itemDef(s.id);
     if (def.kind !== 'consumable') return;
-    if (def.heal) this.health = Math.min(TUNABLES.health.maxHearts, this.health + def.heal);
-    if (def.serenity) this.serenity = Math.min(1, this.serenity + def.serenity);
+    if (s.id === 'mushrooms') this.eatMushrooms();
+    else {
+      if (def.heal) applyHeal(this.health, def.heal);
+      if (def.serenity) this.serenity = Math.min(1, this.serenity + def.serenity);
+    }
     removeItem(this.inventory, s.id, 1);
     this.hud.toast(`Used ${def.name}.`);
     this.bus.emit('itemUsed', { itemId: s.id });
     this.host.audio?.pickup();
   }
 
+  /** Probably Fine Mushrooms: ±1 heart at random (§8.3). */
+  private eatMushrooms(): void {
+    if (this.rng.chance(0.5)) {
+      applyHeal(this.health, 1);
+      this.hud.toast('The mushrooms were fine. Probably.');
+    } else {
+      this.hurt(1);
+      this.hud.toast('The mushrooms were not fine.', 'warn');
+    }
+  }
+
+  // ---- health --------------------------------------------------------------------------------
+  hurt(hearts: number, knockback?: THREE.Vector3): void {
+    if (this.health.hearts <= 0) return;
+    const dead = applyDamage(this.health, hearts);
+    this.serenity = serenityAfterHurt(this.serenity);
+    this.host.audio?.hurt();
+    this.bus.emit('damaged', { hearts });
+    if (knockback) {
+      this.player.velocity.x += knockback.x;
+      this.player.velocity.z += knockback.z;
+      this.player.velocity.y = Math.max(this.player.velocity.y, 2.5);
+      this.player.grounded = false;
+    }
+    if (dead) this.die();
+  }
+
+  /** Red poof, wake at the trailhead bench, fish lost (§12.4). */
+  die(): void {
+    this.endEvent(true);
+    this.conversation.close('died');
+    const lost = removeAllFish(this.inventory);
+    respawn(this.health);
+    this.stats.deaths++;
+    this.serenity = TUNABLES.health.respawnSerenity;
+    this.fishing.forceReel();
+    this.player.teleport(new THREE.Vector3(SPAWN.x, this.world.groundAt(SPAWN.x, SPAWN.z), SPAWN.z), SPAWN.yaw);
+    this.host.audio?.poof();
+    this.hud.toast(lost ? `You wake up at the trailhead. ${lost} fish are gone.` : 'You wake up at the trailhead.', 'warn');
+    this.bus.emit('playerDied', {});
+    this.unlockChecks();
+    void this.save('death');
+  }
+
+  // ---- events (§11) ---------------------------------------------------------------------------
+  async startEvent(type: EventType, preferred?: string, opts: { scripted?: boolean } = {}): Promise<boolean> {
+    if (this.activeEvent || this.eventStarting || this.disposed) return false;
+    const runner = createRunner(type, this.eventHost, preferred, opts);
+    if (!runner) return false;
+    this.eventStarting = true;
+    const def = EVENT_BY_TYPE.get(type)!;
+    onEventStarted(this.director, type, this.now());
+    this.serenity = serenityAfterEvent(this.serenity, def.cls, type);
+    if (def.cls === 'major' && type !== 'party' && this.host.audio) {
+      this.host.audio.recordScratch();
+      this.music?.duck(12);
+    }
+    try {
+      this.activeEvent = runner;
+      await runner.start();
+    } catch (err) {
+      console.error(`event ${type} failed to start`, err);
+      runner.abort();
+    } finally {
+      this.eventStarting = false;
+    }
+    if (runner.done) {
+      this.endEvent(false);
+      return false;
+    }
+    this.bus.emit('eventStarted', { type, npcIds: [...this.npcs.active.keys()] });
+    return true;
+  }
+
+  endEvent(abort: boolean): void {
+    const ev = this.activeEvent;
+    if (!ev) return;
+    if (abort) ev.abort();
+    this.activeEvent = null;
+    onEventEnded(this.director, ev.type, () => this.rng.next());
+    if (!abort) this.stats.eventsSurvived++;
+    this.hud.setRing(null);
+    this.bus.emit('eventEnded', { type: ev.type });
+  }
+
+  memoryFor(id: string): NpcMemory {
+    let m = this.memories[id];
+    if (!m) {
+      m = createMemory();
+      this.memories[id] = m;
+    }
+    return m;
+  }
+
+  private pickNpcsFor(type: EventType, count: number, preferred?: string): NpcDef[] {
+    const active = new Set(this.npcs.active.keys());
+    const talking = this.talkingWith?.def.id;
+    if (talking) active.add(talking);
+    let pool: readonly NpcDef[];
+    switch (type) {
+      case 'visit':
+        pool = NPCS.filter((n) => n.archetypes.includes('camper') || (n.archetypes.includes('oddball') && !n.archetypes.includes('hiker')));
+        break;
+      case 'hiker':
+        pool = NPCS.filter((n) => n.archetypes.includes('hiker') || n.archetypes.includes('oddball'));
+        break;
+      case 'waterwalker':
+        pool = NPCS.filter((n) => n.archetypes.includes('waterwalker'));
+        break;
+      case 'thief':
+        pool = NPCS.filter((n) => n.archetypes.includes('thief'));
+        break;
+      case 'party':
+        pool = NPCS.filter((n) => n.archetypes.includes('partier'));
+        break;
+      case 'ranger':
+        pool = NPCS.filter((n) => n.archetypes.includes('ranger'));
+        break;
+      case 'grudge':
+        pool = NPCS.filter((n) => this.memories[n.id] && grudgeReady(this.memories[n.id]!, this.clock.day));
+        break;
+      default:
+        pool = NPCS;
+    }
+    const out: NpcDef[] = [];
+    if (preferred && isKnownNpc(preferred) && !active.has(preferred)) {
+      out.push(npcDef(preferred));
+      active.add(preferred);
+    }
+    if (out.length < count) out.push(...pickNpcs(pool, this.memories, this.clock.day, this.now(), count - out.length, () => this.rng.next(), active));
+    return out.slice(0, count);
+  }
+
+  /** The reactive bark for the player's current state with this NPC's overrides (§10.4). */
+  barkFor(npc: NpcDef): string | null {
+    const inv = this.inventory;
+    const worn = inv.worn;
+    const p = this.player.feet;
+    const zone = this.world.zoneAt(p.x, p.z) ?? this.world.valley.zoneForZ(p.z);
+    const applies: Partial<Record<BarkCategory, boolean>> = {
+      barrel: worn.full?.id === 'barrel',
+      underwear: !worn.top && !worn.bottom && !worn.full,
+      manInDress: this.character.sex === 'male' && !!worn.full && DRESSES.has(worn.full.id),
+      womanInTuxedo: this.character.sex === 'female' && worn.full?.id === 'tuxedo',
+      tinfoil: worn.hat?.id === 'tinfoil_hat',
+      abducted: recentEvent(this.director, 'ufo', this.now()),
+      oldGus: hasItem(inv, 'fish_old_gus'),
+      wading: this.player.depth > 0.05,
+      trashed: !!zone && isTrashed(this.zones.get(zone.id)!) && this.world.valley.edgeDistance(p.x, p.z) < 25,
+      weapon: false,
+    };
+    const cat = BARK_ORDER.find((c) => applies[c]);
+    if (!cat) return null;
+    const overrides = dialogueFor(npc.id).barks[cat];
+    const pool = overrides && overrides.length ? overrides : SHARED_BARKS[cat];
+    return pool[Math.floor(this.rng.next() * pool.length)] ?? null;
+  }
+
+  eventLine(npc: NpcDef, key: keyof EventLines): string | null {
+    let pool = dialogueFor(npc.id).events[key];
+    if (!pool || !pool.length) for (const a of npc.archetypes) if (DEFAULT_EVENT_LINES[a]?.[key]?.length) pool = DEFAULT_EVENT_LINES[a]![key];
+    if ((!pool || !pool.length) && key === 'grudge') pool = DEFAULT_EVENT_LINES.grudge!.grudge;
+    if (!pool || !pool.length) return null;
+    return pool[Math.floor(this.rng.next() * pool.length)]!;
+  }
+
+  private makeEventHost(): EventHost {
+    const g = this;
+    return {
+      get world() { return g.world; },
+      get npcs() { return g.npcs; },
+      get player() { return g.player; },
+      get hud() { return g.hud; },
+      get audio() { return g.host.audio; },
+      get music() { return g.music; },
+      get bus() { return g.bus; },
+      get rng() { return g.rng; },
+      get inventory() { return g.inventory; },
+      get zones() { return g.zones; },
+      get clock() { return g.clock; },
+      get director() { return g.director; },
+      get stats() { return g.stats; },
+      get journal() { return g.journal; },
+      memoryFor: (id) => g.memoryFor(id),
+      now: () => g.now(),
+      settings: () => g.host.settings.get(),
+      toast: (t, k) => g.hud.toast(t, k),
+      caption: (t) => g.hud.caption(t),
+      give: (id, n, c) => g.give(id, n, c),
+      takeItem: (id, n) => removeItem(g.inventory, id, n),
+      applyWornOutfit: () => g.applyWornOutfit(),
+      equipWorn: (stack) => {
+        const def = itemDef(stack.id);
+        if (!def.slot) return;
+        if (def.slot === 'full') {
+          for (const s of ['top', 'bottom'] as const) {
+            const cur = g.inventory.worn[s];
+            if (cur) addItem(g.inventory, cur);
+            delete g.inventory.worn[s];
+          }
+        }
+        const cur = g.inventory.worn[def.slot];
+        if (cur) addItem(g.inventory, cur);
+        g.inventory.worn[def.slot] = { ...stack, count: 1 };
+      },
+      damage: (h, k) => g.hurt(h, k),
+      forceReel: () => g.fishing.forceReel(),
+      lockPlayer: (locked) => {
+        g.player.locked = locked;
+        g.player.frozen = locked;
+      },
+      teleportPlayer: (feet, yaw) => g.player.teleport(feet, yaw),
+      advanceClockHours: (hours) => {
+        advanceClock(g.clock, hours * SECONDS_PER_GAME_HOUR);
+        if (g.clock.day !== g.lastDay) {
+          decayWanted(g.director, g.clock.day - g.lastDay);
+          g.lastDay = g.clock.day;
+        }
+      },
+      setZoneTrash: (id, amount, center) => {
+        g.world.setZoneTrash(id, amount, center);
+        g.trashPainted.set(id, amount);
+        if (amount >= 0.5) g.dirtyZones.add(id);
+      },
+      spawnPickup: (id, n, at, c) => void g.pickups.spawn(id, n, at, c),
+      talk: (npc, tree, opts) => g.talkWith(npc, tree, opts),
+      isDialogueOpen: () => g.conversation.open,
+      talkingTo: () => g.talkingWith?.def.id ?? null,
+      closeDialogue: () => g.conversation.close('closed'),
+      barkFor: (n) => g.barkFor(n),
+      eventLine: (n, k) => g.eventLine(n, k),
+      bubble: (n, t, s) => g.hud.bubble(n.def.id, t, s),
+      unlockChecks: () => g.unlockChecks(),
+      save: (r) => g.save(r),
+      setAmbienceMuted: (m) => {
+        g.ambienceMuted = m;
+      },
+      setLightFlicker: (a) => {
+        g.world.lightFlicker = a;
+      },
+      pickNpcsFor: (t, c, p) => g.pickNpcsFor(t, c, p),
+      grudgeCandidate: () => {
+        const day = g.clock.day;
+        const list = NPCS.filter((n) => g.memories[n.id] && grudgeReady(g.memories[n.id]!, day) && !isOutOfPool(g.memories[n.id]!, g.now()) && !g.npcs.get(n.id));
+        return list.length ? list[Math.floor(g.rng.next() * list.length)]! : null;
+      },
+    };
+  }
+
+  // ---- conversations (§10.3) --------------------------------------------------------------------
+  private voiceFor(def: NpcDef | null): Voice | null {
+    if (!this.host.audio) return null;
+    return new Voice(this.host.audio, def ? def.voice : { pitch: 1.4, speed: 1.3, timbre: 'sine' });
+  }
+
+  /** Talk to a roster NPC standing in the world. */
+  async talkTo(npc: Npc): Promise<string> {
+    const def = npc.def;
+    const d = dialogueFor(def.id);
+    const bark = this.barkFor(def) ?? undefined;
+    return this.talkWith(npc, d.tree, { name: def.name, ...(bark ? { bark } : {}) });
+  }
+
+  private async talkWith(npc: Npc | null, tree: DialogueTree, opts: { name?: string; skippable?: boolean; bark?: string } = {}): Promise<string> {
+    if (this.conversation.open) this.conversation.close('interrupted');
+    const def = npc?.def ?? null;
+    let portrait: HTMLCanvasElement | null = null;
+    if (npc) {
+      try {
+        portrait = renderPortrait(this.host.gl.renderer, this.world.scene, npc.character.root, 1.62 * def!.look.scale, npc.yaw);
+      } catch {
+        portrait = null;
+      }
+      npc.face(this.player.feet);
+      npc.lookAt(this.player.feet);
+      if (npc.mode !== 'act') npc.mode = 'talk';
+      this.talkingWith = npc;
+      const mem = this.memoryFor(def!.id);
+      const first = markMet(mem, this.clock.day);
+      if (recordPerson(this.journal, def!.id) || first) this.unlockChecks();
+      this.bus.emit('talkStarted', { npcId: def!.id });
+      this.activeEvent?.onTalk(def!.id);
+    }
+    this.openOverlay('dialogue');
+    const last = await this.conversation.start(def?.id ?? null, tree, { name: opts.name ?? def?.name ?? '???', portrait, voice: this.voiceFor(def), skippable: opts.skippable, bark: opts.bark });
+    return last;
+  }
+
+  private conversationHost(): ConversationHost {
+    const g = this;
+    return {
+      context: (npcId) => g.dialogueContext(npcId),
+      applyEffects: (npcId, effects) => g.applyDialogueEffects(npcId, effects),
+      openTrade: (npcId) => g.openTrade(npcId),
+      onClosed: (npcId, lastNode) => {
+        const npc = g.talkingWith;
+        g.talkingWith = null;
+        if (npc) {
+          if (npc.mode === 'talk') npc.mode = 'idle';
+          g.bus.emit('talkEnded', { npcId: npcId ?? npc.def.id, lastNode });
+        }
+        if (g.overlay === 'dialogue' || g.overlay === 'trade') g.closeOverlay();
+      },
+      textSpeed: () => g.host.settings.get().gameplay.textSpeed,
+    };
+  }
+
+  private dialogueContext(npcId: string | null): DialogueContext {
+    const mem = npcId ? this.memoryFor(npcId) : createMemory();
+    const def = npcId && isKnownNpc(npcId) ? npcDef(npcId) : null;
+    const inv = this.inventory;
+    const worn = inv.worn;
+    // `met` is evaluated after markMet, so "met before" means more than this one meeting
+    return {
+      playerName: this.character.name,
+      hasItem: (id, c = 1) => countItem(inv, id) >= c,
+      wearing: (id) => {
+        if (id === 'underwear') return !worn.top && !worn.bottom && !worn.full;
+        if (id === 'dress') return !!worn.full && DRESSES.has(worn.full.id);
+        return Object.values(worn).some((s) => s?.id === id);
+      },
+      relationship: mem.relationship, phase: phaseOf(this.clock), flags: mem.flags, met: mem.met > 1, robbed: mem.robbed > 0, stoleFrom: hasStolenLoot(mem), poofed: mem.poofed > 0,
+      recentEvent: (t) => isEventType(t) && recentEvent(this.director, t, this.now()),
+      weaponDrawn: false, trader: !!def?.trading, rng: () => this.rng.next(),
+    };
+  }
+
+  private applyDialogueEffects(npcId: string | null, effects: DialogueEffect[]): void {
+    const mem = npcId ? this.memoryFor(npcId) : null;
+    for (const e of effects) {
+      if ('give' in e) {
+        this.give(e.give, e.count ?? 1);
+        this.hud.toast(`Received ${itemDef(e.give).name}${(e.count ?? 1) > 1 ? ` ×${e.count}` : ''}`);
+      } else if ('take' in e) removeItem(this.inventory, e.take, e.count ?? 1);
+      else if ('relationship' in e && mem) adjustRelationship(mem, e.relationship);
+      else if ('setFlag' in e && mem) mem.flags[e.setFlag] = e.value ?? true;
+      else if ('serenity' in e) this.serenity = Math.max(0, Math.min(1, this.serenity + e.serenity));
+      else if ('heal' in e) applyHeal(this.health, e.heal);
+      else if ('stat' in e) {
+        const s = this.stats as unknown as Record<string, number>;
+        if (typeof s[e.stat] === 'number') s[e.stat]!++;
+      } else if ('unlock' in e) this.unlock(e.unlock);
+      else if ('mushrooms' in e) this.eatMushrooms();
+    }
+    if (effects.length) this.unlockChecks();
+  }
+
+  /** Their stock (static catalog + whatever they carry / stole), initialized on first trade. */
+  private theirGoods(def: NpcDef): ItemStack[] {
+    const mem = this.memoryFor(def.id);
+    if (!mem.flags.stockInit) {
+      mem.flags.stockInit = true;
+      for (const s of def.trading?.stock ?? []) mem.inventory.push({ ...s });
+      for (const s of def.loot) mem.inventory.push({ ...s });
+    }
+    return mem.inventory;
+  }
+
+  private openTrade(npcId: string): Promise<void> {
+    const def = npcDef(npcId);
+    const mem = this.memoryFor(npcId);
+    if (!def.trading) return Promise.resolve();
+    const theirs = this.theirGoods(def);
+    return new Promise((resolve) => {
+      this.tradeResolve = resolve;
+      this.overlayEl?.remove();
+      this.overlay = 'trade';
+      this.loop.paused = this.host.settings.get().gameplay.pauseInConversations;
+      const screen = tradeScreen({
+        npcName: def.name, trading: def.trading!, relationship: mem.relationship, inv: this.inventory, theirs, rng: () => this.rng.next(),
+        onDeal: (offer, got) => {
+          const ev = evaluateTrade(def.trading!, offer, got, mem.relationship);
+          if (!ev.ok) return;
+          for (const s of offer) removeItem(this.inventory, s.id, s.count);
+          for (const s of got) {
+            const i = theirs.findIndex((t) => t.id === s.id && (t.color ?? null) === (s.color ?? null));
+            if (i >= 0) {
+              theirs[i]!.count -= s.count;
+              if (theirs[i]!.count <= 0) theirs.splice(i, 1);
+            }
+            this.give(s.id, s.count, s.color);
+          }
+          for (const s of offer) {
+            const i = theirs.findIndex((t) => t.id === s.id && (t.color ?? null) === (s.color ?? null));
+            if (i >= 0) theirs[i]!.count += s.count;
+            else theirs.push({ ...s });
+          }
+          adjustRelationship(mem, TUNABLES.trade.relationshipPerTrade);
+          this.stats.tradesCompleted++;
+          if (isJunkForTreasure(offer, got)) this.stats.junkForTreasure++;
+          this.host.audio?.catchChime();
+          this.hud.toast(`Traded with ${def.name}.`);
+          this.bus.emit('tradeCompleted', { npcId, gave: offer, got });
+          this.unlockChecks();
+          void this.save('trade');
+          this.applyWornOutfit();
+          this.updateRodSelection();
+          screen.refresh();
+        },
+        onClose: () => this.closeTrade(),
+      });
+      this.overlayEl = screen.element;
+      this.host.ui.append(screen.element);
+    });
+  }
+
+  private closeTrade(): void {
+    if (this.overlay !== 'trade') return;
+    this.overlayEl?.remove();
+    this.overlayEl = null;
+    this.overlay = 'dialogue';
+    this.loop.paused = this.host.settings.get().gameplay.pauseInConversations;
+    const r = this.tradeResolve;
+    this.tradeResolve = null;
+    r?.();
+  }
+
   // ---- fishing host ------------------------------------------------------------------------
   private fishingHost(): FishingHost {
     return {
       contextFor: (zoneId) => this.catchContext(zoneId),
-      paused: () => this.host.settings.get().gameplay.pauseInConversations && this.overlay !== 'none' && this.overlay !== 'inventory',
+      paused: () => this.host.settings.get().gameplay.pauseInConversations && (this.overlay === 'dialogue' || this.overlay === 'trade' || this.overlay === 'journal'),
       onEvent: (e, zoneId) => this.onFishingEvent(e, zoneId),
       onBobberLanded: (onWater, zoneId) => {
         if (onWater) {
@@ -511,7 +1111,7 @@ export class Game {
     const st = this.zones.get(def.id) ?? createZoneState(def);
     return {
       water: def.water, phase: phaseOf(this.clock), population: st.population, trash: st.trash,
-      ufoRecent: this.director.ufoRecentUntil > 0 && this.clock.day + cycleFraction(this.clock) < this.director.ufoRecentUntil,
+      ufoRecent: this.director.ufoRecentUntil > 0 && this.now() < this.director.ufoRecentUntil,
       legendReady: this.calmSeconds >= TUNABLES.legend.calmSecondsRequired, luckyLure: hasItem(this.inventory, 'lucky_lure'), rng: () => this.rng.next(),
     };
   }
@@ -563,7 +1163,6 @@ export class Game {
     let fits = true;
     let newSpecies = false;
     let newRecord = false;
-    // the reveal: hold the catch up for a beat before the rod comes back
     const an = this.player.character.animator;
     an.playUpper('pickup', { loop: false, fade: 0.1, onFinished: () => an.playUpper(this.fishing.rodOut ? 'fish_idle' : 'idle', { fade: 0.3 }) });
     if (c.kind === 'fish') {
@@ -595,15 +1194,18 @@ export class Game {
     void this.save('catch');
   }
 
-  private unlockChecks(lastCatch?: { fishId?: string; weightLb?: number; itemId?: string }): void {
-    const ids = checkAchievements(this.achievements, { stats: this.stats, journal: this.journal, serenity: this.serenity, playTimeSeconds: this.playTime, lastCatch });
-    for (const id of ids) {
-      this.achievements[id] = new Date().toISOString();
-      const def = ACHIEVEMENT_BY_ID.get(id);
-      this.hud.toast(`Achievement: ${def?.name ?? id}`, 'achievement');
-      this.host.audio?.achievementChime();
-      this.bus.emit('achievement', { id, name: def?.name ?? id });
-    }
+  private unlock(id: string): void {
+    if (this.achievements[id] || !ACHIEVEMENT_BY_ID.has(id)) return;
+    this.achievements[id] = new Date().toISOString();
+    const def = ACHIEVEMENT_BY_ID.get(id);
+    this.hud.toast(`Achievement: ${def?.name ?? id}`, 'achievement');
+    this.host.audio?.achievementChime();
+    this.bus.emit('achievement', { id, name: def?.name ?? id });
+  }
+
+  unlockChecks(lastCatch?: { fishId?: string; weightLb?: number; itemId?: string }): void {
+    const ids = checkAchievements(this.achievements, { stats: this.stats, journal: this.journal, serenity: this.serenity, calmSeconds: this.calmSeconds, playTimeSeconds: this.playTime, lastCatch });
+    for (const id of ids) this.unlock(id);
   }
 
   private onBoundary(): void {
@@ -617,29 +1219,18 @@ export class Game {
     this.bus.emit('wadingTooDeep', {});
   }
 
-  /** Red poof, wake at the trailhead bench, fish lost (§12.4). */
-  die(): void {
-    const lost = removeAllFish(this.inventory);
-    this.health = TUNABLES.health.maxHearts;
-    this.fishing.forceReel();
-    this.player.teleport(new THREE.Vector3(SPAWN.x, this.world.groundAt(SPAWN.x, SPAWN.z), SPAWN.z), SPAWN.yaw);
-    this.host.audio?.poof();
-    this.hud.toast(lost ? `You wake up at the trailhead. ${lost} fish are gone.` : 'You wake up at the trailhead.', 'warn');
-    this.bus.emit('playerDied', {});
-    void this.save('death');
-  }
-
   // ---- overlays ----------------------------------------------------------------------------
   private onCaptureLost(): void {
     if (this.overlay === 'none' && !this.console.open && !this.disposed) this.openOverlay('pause');
   }
 
   openOverlay(kind: Overlay): void {
+    if (kind !== 'dialogue' && kind !== 'trade' && this.conversation.open) this.conversation.close('closed');
     this.closeOverlay();
     this.overlay = kind;
     this.input.suspended = true;
     if (kind !== 'none') this.input.release();
-    this.host.audio?.uiOpen();
+    if (kind !== 'dialogue') this.host.audio?.uiOpen();
     const backToPause = (): void => this.openOverlay('pause');
     switch (kind) {
       case 'pause':
@@ -690,7 +1281,12 @@ export class Game {
         break;
       }
       case 'journal':
-        this.overlayEl = journalScreen({ journal: this.journal, stats: this.stats, achievements: this.achievements, onClose: () => this.closeOverlay() });
+        this.loop.paused = this.host.settings.get().gameplay.pauseInConversations;
+        this.overlayEl = journalScreen({ journal: this.journal, stats: this.stats, achievements: this.achievements, npcs: this.memories, onClose: () => this.closeOverlay() });
+        break;
+      case 'dialogue':
+        // the world keeps running unless the setting says otherwise (§1 #4)
+        this.loop.paused = this.host.settings.get().gameplay.pauseInConversations;
         break;
       default:
         break;
@@ -700,6 +1296,11 @@ export class Game {
 
   closeOverlay(): void {
     if (this.overlay === 'none') return;
+    if (this.overlay === 'trade') this.closeTrade();
+    if ((this.overlay === 'dialogue' || this.overlay === 'trade') && this.conversation.open) {
+      this.conversation.close('closed'); // re-enters through onClosed
+      return;
+    }
     this.overlayEl?.remove();
     this.overlayEl = null;
     this.overlay = 'none';
@@ -716,7 +1317,10 @@ export class Game {
   toRecord(): SaveRecord {
     const p = this.player.feet;
     const zones: SaveRecord['world']['zones'] = {};
-    for (const [id, z] of this.zones) zones[id] = { population: z.population, trash: z.trash };
+    for (const [id, z] of this.zones) {
+      const center = this.world.trashCenter(id);
+      zones[id] = { population: z.population, trash: z.trash, ...(center && z.trash > 0 ? { trashCenter: center } : {}) };
+    }
     return {
       id: this.saveId,
       schemaVersion: SCHEMA_VERSION,
@@ -725,10 +1329,10 @@ export class Game {
       playTimeSeconds: Math.round(this.playTime),
       thumbnail: this.thumbnail(),
       character: this.character,
-      player: { position: [p.x, p.y, p.z], facing: this.player.yaw, health: this.health, inBoat: false, inventory: this.inventory },
+      player: { position: [p.x, p.y, p.z], facing: this.player.yaw, health: this.health.hearts, inBoat: false, inventory: this.inventory },
       world: { clock: { ...this.clock }, zones, boat: null, pickups: this.pickups.serialize() },
-      npcs: {},
-      director: { ...this.director },
+      npcs: this.memories,
+      director: toDirectorSave(this.director),
       progress: { achievements: { ...this.achievements }, stats: { ...this.stats }, journal: this.journal, serenity: this.serenity },
       rng: { seed: 0, state: this.rng.getState() },
     };
@@ -767,7 +1371,7 @@ export class Game {
   }
 
   // ---- console + smoke hooks ---------------------------------------------------------------
-  private commands(): Record<string, (args: string[]) => string> {
+  private commands(): Record<string, (args: string[]) => string | Promise<string>> {
     const self = this;
     return {
       time: ([t]) => (t && setClockTime(self.clock, t) ? `time set to ${formatClock(self.clock)}` : 'usage: time hh:mm'),
@@ -791,6 +1395,11 @@ export class Game {
         }
         self.applyWornOutfit();
         return `wearing ${JSON.stringify(outfitOf(self.inventory).garments)}`;
+      },
+      strip: () => {
+        for (const slot of Object.keys(self.inventory.worn) as (keyof InventoryState['worn'])[]) delete self.inventory.worn[slot];
+        self.applyWornOutfit();
+        return 'stripped to underwear';
       },
       serenity: ([n]) => {
         self.serenity = Math.max(0, Math.min(1, Number(n) / 100));
@@ -819,12 +1428,21 @@ export class Game {
         const z = self.zones.get(zone ?? '');
         if (!z) return `unknown zone; zones: ${ZONES.map((x) => x.id).join(', ')}`;
         z.trash = Math.max(0, Math.min(1, Number(amount) || 0));
-        self.world.setZoneTrash(z.id, z.trash);
+        if (z.trash >= 0.5) {
+          z.population = 0;
+          self.dirtyZones.add(z.id);
+        }
+        self.world.setZoneTrash(z.id, z.trash, [self.player.feet.x, self.player.feet.z]);
+        self.trashPainted.set(z.id, z.trash);
         return `zone ${z.id} trash ${z.trash}`;
       },
       heal: () => {
-        self.health = TUNABLES.health.maxHearts;
+        respawn(self.health);
         return 'healed';
+      },
+      damage: ([n]) => {
+        self.hurt(Number(n) || 1);
+        return `hearts ${self.health.hearts}`;
       },
       kill: () => {
         self.die();
@@ -847,12 +1465,12 @@ export class Game {
       bite: () => {
         const s = self.fishing.state;
         if (s.phase !== 'waiting') return 'no line waiting';
+        if (!s.pending) return 'nothing bites here (population 0)';
         s.biteAt = s.timer;
         s.nibbleTimes = [];
         return 'bite forced';
       },
       catch: ([what]) => {
-        // force what the waiting line will bring up: fish | junk | clothing | <item id> | <fish id>
         const s = self.fishing.state;
         if (s.phase !== 'waiting') return 'no line waiting';
         const ctx = self.catchContext(self.fishing.currentZone ?? 'plank_run');
@@ -872,15 +1490,78 @@ export class Game {
         void self.save('console');
         return 'saving';
       },
-      event: () => 'events arrive in M2',
-      lull: () => 'the director arrives in M2',
+      event: async ([type, npcId]) => {
+        if (!type || !isEventType(type)) return `usage: event <${[...EVENT_BY_TYPE.keys()].join('|')}> [npcId]`;
+        if (type === 'ranger') return 'the ranger arrives in M3';
+        if (self.activeEvent) return `an event is already active: ${self.activeEvent.type}`;
+        const ok = await self.startEvent(type, npcId && isKnownNpc(npcId) ? npcId : undefined);
+        return ok ? `event ${type} started` : `event ${type} could not start here`;
+      },
+      endevent: () => {
+        if (!self.activeEvent) return 'no active event';
+        const t = self.activeEvent.type;
+        self.endEvent(true);
+        return `aborted ${t}`;
+      },
+      npc: async ([id]) => {
+        if (!id || !isKnownNpc(id)) return `usage: npc <id>; ids: ${NPCS.map((n) => n.id).join(', ')}`;
+        const def = npcDef(id);
+        const type: EventType = def.archetypes.includes('waterwalker') ? 'waterwalker' : def.archetypes.includes('hiker') ? 'hiker' : 'visit';
+        if (self.activeEvent) return `an event is already active: ${self.activeEvent.type}`;
+        const ok = await self.startEvent(type, id);
+        return ok ? `${def.name} is on the way` : 'could not spawn';
+      },
+      talk: async ([id]) => {
+        if (!id || !isKnownNpc(id)) return 'usage: talk <npcId> (spawns them next to you and opens the conversation)';
+        const p = self.player.feet;
+        const at = new THREE.Vector3(p.x + Math.sin(self.player.yaw) * 2, p.y, p.z + Math.cos(self.player.yaw) * 2);
+        at.y = self.world.groundAt(at.x, at.z);
+        const npc = await self.npcs.spawn(npcDef(id), at, self.player.yaw + Math.PI);
+        void self.talkTo(npc);
+        return `talking to ${npc.def.name}`;
+      },
+      lull: () => {
+        self.director.lull = true;
+        self.director.lullUntil = self.director.sessionSeconds + TUNABLES.director.lullMinSeconds;
+        return 'lull started';
+      },
+      director: ([mode]) => {
+        if (mode === 'off') self.directorEnabled = false;
+        else if (mode === 'on') self.directorEnabled = true;
+        else if (mode === 'now') self.director.nextEventAt = self.director.sessionSeconds;
+        return `director ${self.directorEnabled ? 'on' : 'off'}; next event in ${(self.director.nextEventAt - self.director.sessionSeconds).toFixed(0)} s; grace ${Math.max(0, self.director.graceUntil - self.director.sessionSeconds).toFixed(0)} s`;
+      },
+      tutorial: ([mode]) => {
+        if (!self.tutorial) return 'no tutorial running';
+        if (mode === 'skip') {
+          self.tutorial.skipToInterruption();
+          self.director.sessionSeconds = Math.max(self.director.sessionSeconds, TUNABLES.director.graceSecondsNewGame - 6);
+          return 'skipping to the interruption';
+        }
+        return 'usage: tutorial skip';
+      },
       unlock: ([id]) => {
         if (!id || !ACHIEVEMENT_BY_ID.has(id)) return 'unknown achievement';
-        self.achievements[id] = new Date().toISOString();
+        self.unlock(id);
         return `unlocked ${id}`;
       },
+      grudge: ([id]) => {
+        if (!id || !isKnownNpc(id)) return 'usage: grudge <npcId> (gives them a grudge, last seen yesterday)';
+        const m = self.memoryFor(id);
+        m.grudge = true;
+        m.lastSeenDay = self.clock.day - TUNABLES.events.grudgeReturnDays;
+        return `${npcDef(id).name} holds a grudge`;
+      },
+      memory: ([id]) => (id && isKnownNpc(id) ? JSON.stringify(self.memories[id] ?? null) : 'usage: memory <npcId>'),
       pos: () => `${self.player.feet.x.toFixed(2)} ${self.player.feet.y.toFixed(2)} ${self.player.feet.z.toFixed(2)} yaw ${self.player.yaw.toFixed(2)}`,
     };
+  }
+
+  /** Every party can still lying in the zone (for the smoke test's cleanup step). */
+  private canPickupIds(zoneId: string): string[] {
+    const zone = ZONES.find((z) => z.id === zoneId);
+    if (!zone) return [];
+    return this.pickups.serialize().filter((p) => p.itemId === 'beer_can' && p.position[2] >= zone.zMin && p.position[2] < zone.zMax).map((p) => p.id);
   }
 
   private installHooks(): void {
@@ -890,8 +1571,16 @@ export class Game {
       run: (line: string) => this.console.run(line),
       state: () => ({
         pos: this.player.feet.toArray(), yaw: this.player.yaw, grounded: this.player.grounded, speed: this.player.speed, anim: this.player.currentAnim(), clock: { ...this.clock }, phase: phaseOf(this.clock), fishing: this.fishing.state.phase, lineOut: this.fishing.lineOut,
-        inventory: this.inventory.slots.filter((s): s is NonNullable<typeof s> => !!s).map((s) => `${s.id}×${s.count}`), worn: outfitOf(this.inventory).garments, selected: this.inventory.selected,
-        stats: { ...this.stats }, achievements: Object.keys(this.achievements), overlay: this.overlay, serenity: this.serenity, health: this.health, zone: this.fishing.currentZone, pickups: this.pickups.count,
+        biteScheduled: Number.isFinite(this.fishing.state.biteAt) && !!this.fishing.state.pending, fishingTimer: this.fishing.state.timer,
+        inventory: this.inventory.slots.filter((s): s is NonNullable<typeof s> => !!s).map((s) => `${s.id}×${s.count}`), worn: outfitOf(this.inventory).garments, wornIds: Object.fromEntries(Object.entries(this.inventory.worn).map(([k, v]) => [k, v?.id])), selected: this.inventory.selected,
+        stats: { ...this.stats }, achievements: Object.keys(this.achievements), overlay: this.overlay, serenity: this.serenity, hearts: this.health.hearts, zone: this.fishing.currentZone, pickups: this.pickups.count,
+        zones: Object.fromEntries([...this.zones].map(([id, z]) => [id, { population: z.population, trash: z.trash, cans: this.canPickupIds(id).length }])),
+        event: this.activeEvent ? { type: this.activeEvent.type, phase: this.activeEvent.phase } : null,
+        npcs: [...this.npcs.active.values()].map((n) => ({ id: n.def.id, pos: n.feet.toArray(), mode: n.mode, tag: n.tag })),
+        dialogue: this.conversation.current,
+        director: { enabled: this.directorEnabled, sessionSeconds: this.director.sessionSeconds, nextIn: this.director.nextEventAt - this.director.sessionSeconds, grace: this.director.graceUntil - this.director.sessionSeconds, lull: this.director.lull, wanted: this.director.wanted, ufoRecentUntil: this.director.ufoRecentUntil, eventsRun: this.director.eventsRun },
+        memories: Object.fromEntries(Object.entries(this.memories).map(([k, m]) => [k, { met: m.met, relationship: m.relationship, grudge: m.grudge, stolen: m.stolen.length, poofed: m.poofed }])),
+        people: [...this.journal.people],
         fps: this.loop.stats(), draws: this.host.gl.renderer.info.render.calls, tris: this.host.gl.renderer.info.render.triangles,
       }),
       key: (action: string, down: boolean) => this.input.inject(action as never, down),
@@ -911,6 +1600,67 @@ export class Game {
         this.applyWornOutfit();
         return r.ok;
       },
+      // M2 hooks
+      talk: async (id: string) => {
+        const npc = this.npcs.get(id) ?? (await this.npcs.spawn(npcDef(id), new THREE.Vector3(this.player.feet.x + 1.5, this.player.feet.y, this.player.feet.z + 1.5), this.player.yaw + Math.PI));
+        void this.talkTo(npc);
+        return true;
+      },
+      choose: (i: number) => this.conversation.pressChoice(i),
+      chooseText: (text: string) => {
+        const cur = this.conversation.current;
+        const i = cur?.choices.findIndex((c) => c.startsWith(text)) ?? -1;
+        if (i >= 0) this.conversation.pressChoice(i);
+        return i >= 0;
+      },
+      advance: () => this.conversation.advance(),
+      skipVignette: () => this.conversation.skip(),
+      endEvent: () => this.endEvent(true),
+      startEvent: (type: EventType, npcId?: string) => this.startEvent(type, npcId),
+      pickupAllCans: (zoneId: string) => {
+        const ids = this.canPickupIds(zoneId);
+        for (const id of ids) this.pickUp(id);
+        return ids.length;
+      },
+      setSetting: (path: string, value: unknown) => {
+        this.host.settings.update((s) => {
+          const [a, b] = path.split('.');
+          (s as unknown as Record<string, Record<string, unknown>>)[a!]![b!] = value;
+        });
+        return true;
+      },
+      dealTrade: (offer: string[], ask: string[]) => this.dealTradeByIds(offer, ask),
     };
+  }
+
+  /** Smoke helper: complete the open trade with the given item ids (one each). */
+  private dealTradeByIds(offer: string[], ask: string[]): boolean {
+    const npc = this.talkingWith;
+    const trading = npc?.def.trading;
+    if (!npc || this.overlay !== 'trade' || !trading) return false;
+    const def = npc.def;
+    const mem = this.memoryFor(def.id);
+    const theirs = this.theirGoods(def);
+    const yourOffer: ItemStack[] = offer.map((id) => ({ id, count: 1 }));
+    const got: ItemStack[] = ask.map((id) => ({ id, count: 1 }));
+    const ev = evaluateTrade(trading, yourOffer, got, mem.relationship);
+    if (!ev.ok) return false;
+    for (const s of yourOffer) removeItem(this.inventory, s.id, 1);
+    for (const s of got) {
+      const i = theirs.findIndex((t) => t.id === s.id);
+      if (i >= 0) {
+        theirs[i]!.count -= 1;
+        if (theirs[i]!.count <= 0) theirs.splice(i, 1);
+      }
+      this.give(s.id, 1);
+    }
+    for (const s of yourOffer) theirs.push({ ...s });
+    adjustRelationship(mem, TUNABLES.trade.relationshipPerTrade);
+    this.stats.tradesCompleted++;
+    if (isJunkForTreasure(yourOffer, got)) this.stats.junkForTreasure++;
+    this.bus.emit('tradeCompleted', { npcId: def.id, gave: yourOffer, got });
+    this.unlockChecks();
+    this.closeTrade();
+    return true;
   }
 }

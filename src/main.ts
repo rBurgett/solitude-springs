@@ -37,6 +37,7 @@ class App {
   private screenDispose: (() => void) | null = null;
   private flyover: { camera: THREE.PerspectiveCamera; t: number; raf: number; clock: ReturnType<typeof createClock> } | null = null;
   private loading: { root: HTMLElement; bar: HTMLElement; label: HTMLElement; tip: HTMLElement } | null = null;
+  private menuShown = false;
 
   constructor(root: HTMLElement) {
     this.root = root;
@@ -110,6 +111,8 @@ class App {
   async showMenu(): Promise<void> {
     this.startFlyover();
     const hasSaves = await this.hasSaves();
+    if (this.game) return; // a session started while we were checking (tools call quickStart)
+    this.menuShown = true;
     this.setScreen(
       mainMenuScreen({
         hasSaves,
@@ -228,7 +231,7 @@ class App {
   }
 
   get ready(): boolean {
-    return !!this.world;
+    return !!this.world && this.menuShown;
   }
 
   private async loadGame(id: string): Promise<void> {
@@ -251,7 +254,6 @@ class App {
     this.showLoading();
     // reset per-session world state
     for (const z of ['pool', 'cedar_run', 'camp_run', 'plank_run', 'sandy_bend', 'dock_run', 'suspension_run', 'upper_marsh', 'marsh', 'deep_marsh']) this.world.setZoneTrash(z, 0);
-    if ('save' in source) for (const [id, z] of Object.entries(source.save.world.zones)) this.world.setZoneTrash(id, z.trash);
     const game = await Game.create(
       {
         world: this.world,

@@ -36,7 +36,9 @@ export class Input {
     target.addEventListener('mousedown', this.onMouseDown);
     window.addEventListener('mouseup', this.onMouseUp);
     window.addEventListener('mousemove', this.onMouseMove);
-    target.addEventListener('wheel', this.onWheel, { passive: false });
+    // while the pointer is locked, wheel events belong to the game wherever the browser hit-tests them
+    // (the hidden cursor can sit over any element), so listen on the window in the capture phase
+    window.addEventListener('wheel', this.onWheel, { passive: false, capture: true });
     target.addEventListener('contextmenu', (e) => e.preventDefault());
     document.addEventListener('pointerlockchange', this.onLockChange);
   }
@@ -48,7 +50,7 @@ export class Input {
     this.target.removeEventListener('mousedown', this.onMouseDown);
     window.removeEventListener('mouseup', this.onMouseUp);
     window.removeEventListener('mousemove', this.onMouseMove);
-    this.target.removeEventListener('wheel', this.onWheel);
+    window.removeEventListener('wheel', this.onWheel, { capture: true });
     document.removeEventListener('pointerlockchange', this.onLockChange);
   }
 
@@ -109,9 +111,10 @@ export class Input {
   };
 
   private onWheel = (e: WheelEvent): void => {
-    if (!this.captured) return;
+    if (!this.captured || this.suspended) return;
     e.preventDefault();
-    this.wheel += Math.sign(e.deltaY);
+    e.stopPropagation();
+    this.wheel += Math.sign(e.deltaY || e.deltaX);
   };
 
   private onLockChange = (): void => {

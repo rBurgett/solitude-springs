@@ -6,6 +6,10 @@
 // fish up and equip a dress → wait (via `speed`) until night → Save & Quit → the load screen
 // shows "{localized date} {name}" → loading restores position, clock, inventory and the dress.
 // Also: a missed bite leaves the line out, reeling early retrieves it, walking away auto-reels.
+// M2 section (plan §20 M2 acceptance): every event forced from the console with screenshots of its
+// key beats — thief (strip → barrel), party (zero bites, cans clear the water), bear (fish only),
+// UFO (same spot, new clothes), water-walker, camper visit + dialogue + trade, gator, the pause
+// toggle, and save/load mid-trash.
 import path from 'node:path';
 import { launchChromium, startDevServer, parseArgs, reportConsole, ROOT, sleep } from './cdp.mjs';
 
@@ -117,6 +121,7 @@ try {
   await browser.click('[data-action=begin]');
   await browser.waitFor('!!window.__ss', 120_000);
   await ev('window.__ss.hideClickToPlay()');
+  await run('director off');
   await sleep(1200);
   let s = await state();
   console.log('  spawn', s.pos.map((v) => v.toFixed(1)).join(','), 'clock', s.clock, 'phase', s.phase);
@@ -258,6 +263,288 @@ try {
   expect(s.worn.full === 'short_dress', 'worn dress restored');
   expect(s.inventory.length === beforeSave.inventory.length, 'inventory restored');
   await shot('loaded');
+  await run('director off');
+
+  // ===================== M2: the interruptions =====================
+  const waitEvent = async (pred, msg, timeout = 90_000) => waitState((x) => pred(x.event), msg, timeout);
+  const forceEvent = async (type, npcId) => {
+    const out = await run(`event ${type}${npcId ? ' ' + npcId : ''}`);
+    expect(String(out).includes('started'), `event ${type} starts (${out})`);
+  };
+  const endEvent = async () => {
+    await ev('window.__ss.endEvent()');
+    await waitEvent((e) => e === null, 'event to end', 10_000);
+  };
+  await run('time 12:00');
+  await run('tp campground');
+  await sleep(800);
+
+  // --- camper visit: Barb walks in, we talk, chat, trade, goodbye ---
+  await forceEvent('visit', 'barb');
+  s = await waitState((x) => x.npcs.some((n) => n.id === 'barb' && n.mode === 'idle' && Math.hypot(n.pos[0] - x.pos[0], n.pos[2] - x.pos[2]) < 4), 'Barb to arrive', 90_000);
+  await sleep(600);
+  await shot('visit-barb');
+  await run('give fish_bluegill 3');
+  await ev('window.__ss.talk("barb")');
+  s = await waitState((x) => x.dialogue && x.overlay === 'dialogue', 'the dialogue box', 10_000);
+  await sleep(2500);
+  await shot('dialogue');
+  // the reactive bark (a man in a dress) comes first, then the greeting, then the menu
+  const toMenu = async () => {
+    for (let i = 0; i < 8; i++) {
+      const d = (await state()).dialogue;
+      if (d && d.choices.includes('Chat')) return;
+      await ev('window.__ss.advance()');
+      await sleep(400);
+    }
+  };
+  await toMenu();
+  s = await waitState((x) => x.dialogue && x.dialogue.choices.includes('Chat'), 'the menu', 10_000);
+  expect(s.dialogue.choices.includes('Trade'), 'Barb offers a trade');
+  await ev('window.__ss.chooseText("Chat")');
+  await sleep(600);
+  await toMenu();
+  s = await waitState((x) => x.dialogue && x.dialogue.choices.includes('Trade'), 'back at the menu', 10_000);
+  await ev('window.__ss.chooseText("Trade")');
+  for (let i = 0; i < 8 && (await state()).overlay !== 'trade'; i++) {
+    await ev('window.__ss.advance()');
+    await sleep(400);
+  }
+  s = await waitState((x) => x.overlay === 'trade', 'the trade screen', 10_000);
+  await sleep(800);
+  await shot('trade');
+  const dealt = await ev('window.__ss.dealTrade(["fish_bluegill", "fish_bluegill", "fish_bluegill"], ["lucky_lure"])');
+  expect(dealt === true, 'three bluegill buy a lucky lure (Barb: bluegill is her favourite)');
+  s = await state();
+  expect(s.inventory.some((i) => i.startsWith('lucky_lure')), 'lucky lure received');
+  expect(s.stats.tradesCompleted === 1, 'trade counted');
+  s = await waitState((x) => x.dialogue && x.dialogue.choices.length > 0, 'menu after trading', 10_000);
+  await ev('window.__ss.chooseText("Goodbye")');
+  for (let i = 0; i < 8 && (await state()).overlay !== 'none'; i++) {
+    await ev('window.__ss.advance()');
+    await sleep(400);
+  }
+  s = await waitState((x) => x.overlay === 'none', 'conversation closed', 10_000);
+  expect(s.people.includes('barb'), 'Barb is in the journal');
+  expect(s.memories.barb && s.memories.barb.met >= 1, 'Barb remembers meeting');
+  await endEvent();
+
+  // --- pause toggle: off keeps the bite timer running during dialogue; on pauses the world ---
+  await run('tp campground');
+  await sleep(500);
+  s = await state();
+  s = await castAndWait(yawToward(s.pos[0], s.pos[2], s.pos[0] - 20, s.pos[2]));
+  expect(s.fishing === 'waiting', 'line waiting for the pause test');
+  await run('bite');
+  await ev('window.__ss.talk("mike")');
+  await waitState((x) => x.overlay === 'dialogue', 'talking to Mike', 10_000);
+  s = await waitState((x) => x.fishing === 'bite' || x.stats.bitesMissed >= 2, 'the bite arrives while talking (toggle off)', 8000);
+  await ev('window.__ss.closeOverlay()');
+  await sleep(300);
+  await key('use', true);
+  await sleep(100);
+  await key('use', false);
+  await waitState((x) => x.fishing === 'idle', 'line back in', 8000);
+  await ev('window.__ss.setSetting("gameplay.pauseInConversations", true)');
+  s = await castAndWait(yawToward(s.pos[0], s.pos[2], s.pos[0] - 20, s.pos[2]));
+  expect(s.fishing === 'waiting', 'line waiting for the toggle-on test');
+  await ev('window.__ss.talk("mike")');
+  s = await waitState((x) => x.overlay === 'dialogue', 'talking to Mike again', 10_000);
+  await sleep(300);
+  const timerAtStart = (await state()).fishingTimer;
+  await sleep(2500);
+  s = await state();
+  console.log('  toggle on: fishing timer', timerAtStart.toFixed(2), '→', s.fishingTimer.toFixed(2), 'phase', s.fishing);
+  expect(s.fishing === 'waiting' && s.fishingTimer - timerAtStart < 0.2, 'toggle on: the bite timer paused while talking');
+  await ev('window.__ss.closeOverlay()');
+  await ev('window.__ss.setSetting("gameplay.pauseInConversations", false)');
+  await sleep(300);
+  await key('use', true);
+  await sleep(100);
+  await key('use', false);
+  await waitState((x) => x.fishing === 'idle', 'line back in (2)', 8000);
+  await endEvent();
+
+  // --- thief: with nothing wanted, strips to underwear; a second attempt on underwear → barrel ---
+  await run('tp campground');
+  await run('speed 2');
+  // nothing in the bag but the rod (bound): the thief finds nothing it wants
+  await ev(`(() => { const inv = window.__ss.game.inventory; for (let i = 1; i < inv.slots.length; i++) inv.slots[i] = null; return true; })()`);
+  s = await state();
+  expect(s.wornIds.full === 'short_dress' || s.wornIds.top, 'dressed before the thief');
+  await forceEvent('thief', 'pete');
+  s = await waitEvent((e) => e && e.phase === 'rummage', 'Pete to rummage', 60_000);
+  await shot('thief-rummage');
+  s = await waitState((x) => x.event === null || x.event.phase === 'flee', 'the theft', 30_000);
+  s = await state();
+  console.log('  thief took:', JSON.stringify(s.memories.pete), 'worn', JSON.stringify(s.wornIds), 'stripped', s.stats.timesStripped);
+  expect(s.stats.timesStripped === 1 && !s.wornIds.top && !s.wornIds.bottom && !s.wornIds.full, 'stripped to underwear');
+  expect(s.achievements.includes('emperors_new_clothes'), "The Emperor's New Clothes unlocked");
+  await shot('thief-flee');
+  await endEvent();
+  s = await state();
+  expect(!s.wornIds.top && !s.wornIds.bottom && !s.wornIds.full, 'in underwear');
+  await forceEvent('thief', 'earl');
+  s = await waitState((x) => x.stats.barrelsReceived >= 1, 'the pity barrel', 60_000);
+  expect(s.wornIds.full === 'barrel', 'wearing the barrel');
+  expect(s.achievements.includes('barrel_of_laughs'), 'Barrel of Laughs unlocked');
+  await sleep(800);
+  await shot('barrel');
+  await endEvent();
+  await run('speed 1');
+
+  // --- party: zero bites afterwards; picking up every can clears the water; save/load mid-trash ---
+  await run('tp sandy_bend');
+  await run('time 13:00');
+  await sleep(600);
+  await forceEvent('party');
+  s = await waitEvent((e) => e && e.phase === 'party', 'the party to start', 90_000);
+  // face the party (it sets up between the player and the water)
+  s = await state();
+  await ev(`window.__ss.setYaw(${yawToward(s.pos[0], s.pos[2], s.pos[0] + 8, s.pos[2] + 2)}, 0.2)`);
+  await sleep(1500);
+  await shot('party');
+  await run('speed 3');
+  s = await waitEvent((e) => e === null || e.phase === 'leave', 'the party to end', 60_000);
+  await run('speed 1');
+  s = await state();
+  const partyZone = Object.entries(s.zones).find(([, z]) => z.trash >= 0.99 && z.cans > 0);
+  expect(!!partyZone, 'a zone is trashed with cans');
+  const [pzId, pz] = partyZone;
+  console.log('  trashed zone', pzId, 'cans', pz.cans, 'population', pz.population);
+  expect(pz.population === 0, 'population 0 after the party');
+  await sleep(1500);
+  await shot('party-aftermath');
+  await endEvent();
+  // no bites in the trashed zone
+  s = await state();
+  s = await castAndWait(yawToward(s.pos[0], s.pos[2], s.pos[0] + 20, s.pos[2]));
+  if (s.fishing === 'waiting') {
+    expect(!s.biteScheduled, 'no bite scheduled in a trashed zone');
+    await key('use', true);
+    await sleep(100);
+    await key('use', false);
+    await waitState((x) => x.fishing === 'idle', 'reel in', 8000);
+  }
+  // save + load mid-trash keeps the visuals and the cans
+  const cansBefore = pz.cans;
+  await ev('window.__ss.openOverlay("pause")');
+  await sleep(300);
+  await browser.click('[data-action=savequit]');
+  await browser.waitFor('!!document.querySelector("[data-action=new]") && !window.__ss', 30_000);
+  await browser.click('[data-action=load]');
+  await browser.waitFor('!!document.querySelector(".save-row")', 20_000);
+  await browser.click('.save-row [data-action=load]');
+  await browser.waitFor('!!window.__ss', 120_000);
+  await ev('window.__ss.hideClickToPlay()');
+  await run('director off');
+  await sleep(1500);
+  s = await state();
+  expect(s.zones[pzId].trash >= 0.98 && s.zones[pzId].cans === cansBefore, `trash state restored (${s.zones[pzId].trash}, ${s.zones[pzId].cans} cans)`);
+  await shot('party-loaded');
+  const picked = await ev(`window.__ss.pickupAllCans(${JSON.stringify(pzId)})`);
+  s = await state();
+  console.log('  picked up', picked, 'cans; zone trash now', s.zones[pzId].trash);
+  expect(s.zones[pzId].trash === 0, 'water cleared after collecting every can');
+  expect(s.achievements.includes('leave_no_trace'), 'Leave No Trace unlocked');
+  await sleep(1200);
+  await shot('party-cleaned');
+
+  // --- bear: with fish, empties fish only ---
+  await run('tp campground');
+  await run('give fish_bluegill 4');
+  await run('give lucky_lure 1');
+  await run('speed 2');
+  await forceEvent('bear');
+  s = await waitEvent((e) => e && e.phase === 'sniff', 'the bear to sniff', 60_000);
+  await shot('bear');
+  s = await waitState((x) => x.stats.fishLostToBears >= 4, 'the bear to take the fish', 30_000);
+  expect(!s.inventory.some((i) => i.startsWith('fish_')), 'no fish left');
+  expect(s.inventory.some((i) => i.startsWith('lucky_lure')), 'the lure stays');
+  await sleep(600);
+  await shot('bear-swipe');
+  await endEvent();
+  await run('speed 1');
+
+  // --- water-walker: Marina rises from the river ---
+  await run('tp sandy_bend');
+  await sleep(500);
+  await forceEvent('waterwalker', 'marina');
+  s = await waitEvent((e) => e && e.phase === 'walk', 'Marina to surface', 30_000);
+  // face the river: she rises on the player's side of the channel
+  s = await state();
+  const marina = s.npcs.find((n) => n.id === 'marina');
+  if (marina) await ev(`window.__ss.setYaw(${yawToward(s.pos[0], s.pos[2], marina.pos[0], marina.pos[2])}, 0.15)`);
+  await sleep(800);
+  await shot('water-walker');
+  s = await waitEvent((e) => e && e.phase === 'linger', 'Marina on the bank', 60_000);
+  await endEvent();
+
+  // --- alligator: near the marsh water; a lunge or a sink ---
+  await run('tp marsh');
+  await sleep(500);
+  s = await state();
+  const heartsBefore = s.hearts;
+  await forceEvent('gator');
+  await sleep(2200);
+  await shot('gator');
+  s = await waitEvent((e) => e === null, 'the gator to finish', 40_000);
+  console.log('  gator: hearts', heartsBefore, '→', s.hearts, 'bites', s.stats.gatorBites);
+  expect(s.hearts <= heartsBefore, 'the gator never heals');
+
+  // --- grudge return: an armed NPC comes back with a demand (for the most valuable thing carried) ---
+  await run('tp campground');
+  await ev(`(() => { const inv = window.__ss.game.inventory; for (let i = 1; i < inv.slots.length; i++) inv.slots[i] = null; return true; })()`);
+  await run('give trophy 1');
+  await run('grudge wade');
+  await forceEvent('grudge', 'wade');
+  s = await waitState((x) => x.overlay === 'dialogue' && x.dialogue && x.dialogue.npcId === 'wade', "Wade's demand", 60_000);
+  await sleep(2000);
+  await shot('grudge');
+  for (let i = 0; i < 6 && !(await state()).dialogue?.choices.length; i++) { await ev('window.__ss.advance()'); await sleep(400); }
+  s = await state();
+  expect(s.dialogue && s.dialogue.choices.some((c) => c.startsWith('Fine')), 'the hand-over choice');
+  await ev('window.__ss.chooseText("Fine")');
+  await sleep(1500);
+  await ev('window.__ss.advance()');
+  await sleep(300);
+  await ev('window.__ss.advance()');
+  s = await waitState((x) => x.overlay === 'none', 'grudge settled', 15_000);
+  expect(!s.inventory.some((i) => i.startsWith('trophy')), 'the trophy was handed over');
+  expect(s.stats.grudgesHandled === 1 && s.achievements.includes('grudge_match'), 'Grudge Match unlocked');
+  await endEvent();
+
+  // --- UFO: returns the player within 0.1 m of the original position with different clothing ---
+  await run('tp campground');
+  await run('time 23:00');
+  await sleep(600);
+  s = await state();
+  const beforeUfo = s;
+  await forceEvent('ufo');
+  s = await waitEvent((e) => e && e.phase === 'descent', 'the saucer', 30_000);
+  await sleep(2500);
+  await shot('ufo-descent');
+  s = await waitEvent((e) => e && e.phase === 'beam', 'the beam', 30_000);
+  await sleep(2000);
+  await shot('ufo-beam');
+  s = await waitState((x) => x.overlay === 'dialogue', 'the interview', 30_000);
+  await sleep(1500);
+  await shot('ufo-interview');
+  for (let i = 0; i < 40 && (await state()).overlay === 'dialogue'; i++) {
+    await ev('window.__ss.advance()'); // finishes typing, or continues a line without choices
+    await sleep(300);
+    const d = (await state()).dialogue;
+    if (d && d.choices.length && !d.typing) await ev('window.__ss.choose(0)');
+    await sleep(300);
+  }
+  s = await waitEvent((e) => e === null, 'the return', 40_000);
+  const dd = Math.hypot(s.pos[0] - beforeUfo.pos[0], s.pos[2] - beforeUfo.pos[2]);
+  console.log('  ufo return delta', dd.toFixed(3), 'worn', JSON.stringify(s.wornIds), 'was', JSON.stringify(beforeUfo.wornIds), 'clock', s.clock.time - beforeUfo.clock.time);
+  expect(dd < 0.1, 'returned within 0.1 m');
+  expect(JSON.stringify(s.wornIds) !== JSON.stringify(beforeUfo.wornIds), 'different worn clothing');
+  expect(s.stats.abductions === 1 && s.achievements.includes('close_encounter'), 'abduction counted');
+  await sleep(600);
+  await shot('ufo-return');
   const fps = await browser.measureFps(1500);
   console.log(`  fps (${flags.gpu ? 'gpu' : 'swiftshader'}) ~ ${fps.toFixed(1)}  draws ${s.draws} tris ${s.tris}`);
 } catch (err) {

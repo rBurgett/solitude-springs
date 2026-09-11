@@ -24,6 +24,25 @@ export interface GameEvents {
   playerDied: Record<string, never>;
   boundaryBump: Record<string, never>;
   wadingTooDeep: Record<string, never>;
+  // M2 (§11, §18.2)
+  eventStarted: { type: string; npcIds: string[] };
+  eventEnded: { type: string };
+  theftStarted: { npcId: string };
+  theft: { npcId: string; items: { id: string; count: number }[]; stripped: boolean; barrel: boolean };
+  partyStarted: { zoneId: string };
+  partyEnded: { zoneId: string; cans: number; brokeUp: boolean };
+  zoneCleaned: { zoneId: string };
+  bearArrived: Record<string, never>;
+  bearTook: { fish: number };
+  bearLeft: { scared: boolean };
+  gatorBit: Record<string, never>;
+  abducted: { hours: number; outfit: string[] };
+  talkStarted: { npcId: string };
+  talkEnded: { npcId: string; lastNode: string };
+  tradeCompleted: { npcId: string; gave: { id: string; count: number }[]; got: { id: string; count: number }[] };
+  damaged: { hearts: number };
+  serenityChanged: { value: number };
+  lull: { started: boolean };
 }
 
 type Handler<T> = (payload: T) => void;

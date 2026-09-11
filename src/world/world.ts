@@ -40,7 +40,9 @@ export class World {
   private renderer: THREE.WebGLRenderer;
   private lastPhaseKey = '';
   /** Per-zone trash visuals: painted centre/radius on the trash mask + water tint. */
-  private zoneTrash = new Map<string, number>();
+  private zoneTrash = new Map<string, { amount: number; cx: number; cz: number; radius: number }>();
+  /** 0..1 light flicker (the UFO omen), applied on top of the clock preset. */
+  lightFlicker = 0;
 
   private constructor(o: WorldOptions, parts: { valley: Valley; grid: WorldGrid; splat: SplatTextures; chunks: TerrainChunks; river: RiverSurface; bridges: BridgeBuild[]; dock: DockBuild; props: Props; vegetation: Vegetation; rig: LightingRig; physics: PhysicsWorld; index: AssetIndex }) {
     this.renderer = o.renderer;
@@ -113,8 +115,8 @@ export class World {
   }
 
   /** Physics ground under a point (trees, bridges, dock included); falls back to the height grid. */
-  groundAt(x: number, z: number, fromY = 60): number {
-    const hit = this.physics.raycastDown(x, fromY, z, 200);
+  groundAt(x: number, z: number, fromY = 60, exclude?: import('@dimforge/rapier3d-compat').Collider): number {
+    const hit = this.physics.raycastDown(x, fromY, z, 200, exclude);
     return hit ? hit.y : this.grid.heightAt(x, z);
   }
 
@@ -131,24 +133,35 @@ export class World {
     return this.valley.areaAt(x, z);
   }
 
-  /** Paint a zone's trash level onto the ground and water (M2 parties; console `trash`). */
-  setZoneTrash(zoneId: string, amount: number): void {
+  /**
+   * Paint a zone's trash level onto the ground and water (parties, recovery, console `trash`).
+   * `center` (x, z) is where the party was; without one the zone centre is used. Repainting with a
+   * different centre first clears the old patch.
+   */
+  setZoneTrash(zoneId: string, amount: number, center?: [number, number]): void {
     const zone = ZONES.find((z) => z.id === zoneId);
     if (!zone) return;
-    const prev = this.zoneTrash.get(zoneId) ?? 0;
     const zc = (zone.zMin + zone.zMax) / 2;
-    const cx = this.valley.riverCenterX(zc);
-    const radius = (zone.zMax - zone.zMin) / 2 + 14;
-    this.splat.paintTrash(cx, zc, radius, amount - prev);
-    this.zoneTrash.set(zoneId, amount);
+    const prev = this.zoneTrash.get(zoneId);
+    const radius = TUNABLES.events.partyRadius;
+    const cx = center ? center[0] : (prev?.cx ?? this.valley.riverCenterX(zc));
+    const cz = center ? center[1] : (prev?.cz ?? zc);
+    if (prev && (Math.abs(prev.cx - cx) > 0.5 || Math.abs(prev.cz - cz) > 0.5)) {
+      this.splat.paintTrash(prev.cx, prev.cz, prev.radius, -prev.amount);
+      this.splat.paintTrash(cx, cz, radius, amount);
+    } else this.splat.paintTrash(cx, cz, radius, amount - (prev?.amount ?? 0));
+    this.zoneTrash.set(zoneId, { amount, cx, cz, radius });
     // the water shader supports one tinted zone at a time: the dirtiest wins
-    let worst: [string, number] | null = null;
-    for (const e of this.zoneTrash) if (!worst || e[1] > worst[1]) worst = e;
-    if (worst && worst[1] > 0.01) {
-      const wz = ZONES.find((z) => z.id === worst![0])!;
-      const wzc = (wz.zMin + wz.zMax) / 2;
-      this.river.uniforms.uTrash.value.set(this.valley.riverCenterX(wzc), wzc, (wz.zMax - wz.zMin) / 2 + 6, Math.min(1, worst[1]));
-    } else this.river.uniforms.uTrash.value.set(0, 0, 0, 0);
+    let worst: { id: string; amount: number; cx: number; cz: number } | null = null;
+    for (const [id, e] of this.zoneTrash) if (!worst || e.amount > worst.amount) worst = { id, ...e };
+    if (worst && worst.amount > 0.01) this.river.uniforms.uTrash.value.set(worst.cx, worst.cz, radius * 0.9, Math.min(1, worst.amount));
+    else this.river.uniforms.uTrash.value.set(0, 0, 0, 0);
+  }
+
+  /** Current trash visuals per zone (for saving the centre). */
+  trashCenter(zoneId: string): [number, number] | null {
+    const t = this.zoneTrash.get(zoneId);
+    return t ? [t.cx, t.cz] : null;
   }
 
   /** Lighting for the clock: blended presets, the sun tracking the player, water sky reflection. */
@@ -159,6 +172,11 @@ export class World {
     // the HDRI/background swap only when the phase key changes (allocation-free otherwise)
     const key = `${preset.hdri}-${nightWeight >= 0.5 ? 'n' : 'd'}`;
     this.rig.applyPreset(this.scene, this.renderer, preset, nightWeight);
+    if (this.lightFlicker > 0) {
+      const k = 1 - this.lightFlicker * (Math.random() < 0.5 ? 0.85 : 0.1);
+      this.rig.sun.intensity *= k;
+      this.rig.hemi.intensity *= 0.6 + 0.4 * k;
+    }
     if (key !== this.lastPhaseKey) {
       this.lastPhaseKey = key;
       const sky = preset.hdri && nightWeight < 0.5 ? (this.rig.hdris[preset.hdri] ?? null) : null;

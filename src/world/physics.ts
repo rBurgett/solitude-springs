@@ -6,6 +6,14 @@ import type { WorldGrid } from './map.ts';
 
 let ready: Promise<typeof RAPIER> | null = null;
 
+/** Collision-group bits: static world (terrain, bridges, trunks, props) vs character capsules. */
+export const GROUP_WORLD = 0x0001;
+export const GROUP_CHARACTER = 0x0002;
+/** Interaction groups for a character capsule: member of CHARACTER, collides with everything. */
+export const CHARACTER_GROUPS = (GROUP_CHARACTER << 16) | 0xffff;
+/** Ray filter that sees the world but not people (ground probes, the camera, the bobber). */
+export const WORLD_ONLY = (0xffff << 16) | GROUP_WORLD;
+
 export function initRapier(): Promise<typeof RAPIER> {
   if (!ready) ready = RAPIER.init().then(() => RAPIER);
   return ready;
@@ -62,20 +70,20 @@ export class PhysicsWorld {
     this.world.removeCollider(c, false);
   }
 
-  /** Cast a ray straight down from (x, y, z). */
-  raycastDown(x: number, y: number, z: number, maxDist = 100, exclude?: RAPIER.Collider): GroundHit | null {
+  /** Cast a ray straight down from (x, y, z). Sees the world, never a character capsule. */
+  raycastDown(x: number, y: number, z: number, maxDist = 100, exclude?: RAPIER.Collider, groups: number = WORLD_ONLY): GroundHit | null {
     this.ray.origin = { x, y, z };
     this.ray.dir = { x: 0, y: -1, z: 0 };
-    const hit = this.world.castRayAndGetNormal(this.ray, maxDist, true, undefined, undefined, exclude);
+    const hit = this.world.castRayAndGetNormal(this.ray, maxDist, true, undefined, groups, exclude);
     if (!hit) return null;
     return { y: y - hit.timeOfImpact, normal: new THREE.Vector3(hit.normal.x, hit.normal.y, hit.normal.z), collider: hit.collider };
   }
 
-  /** Generic ray for the bobber flight (returns the hit point or null). */
-  raycast(origin: THREE.Vector3, dir: THREE.Vector3, maxDist: number, exclude?: RAPIER.Collider): { point: THREE.Vector3; normal: THREE.Vector3; toi: number } | null {
+  /** Generic ray for the bobber flight and the camera (world only; people don't block it). */
+  raycast(origin: THREE.Vector3, dir: THREE.Vector3, maxDist: number, exclude?: RAPIER.Collider, groups: number = WORLD_ONLY): { point: THREE.Vector3; normal: THREE.Vector3; toi: number } | null {
     this.ray.origin = { x: origin.x, y: origin.y, z: origin.z };
     this.ray.dir = { x: dir.x, y: dir.y, z: dir.z };
-    const hit = this.world.castRayAndGetNormal(this.ray, maxDist, true, undefined, undefined, exclude);
+    const hit = this.world.castRayAndGetNormal(this.ray, maxDist, true, undefined, groups, exclude);
     if (!hit) return null;
     return { point: origin.clone().addScaledVector(dir, hit.timeOfImpact), normal: new THREE.Vector3(hit.normal.x, hit.normal.y, hit.normal.z), toi: hit.timeOfImpact };
   }
@@ -108,7 +116,7 @@ export class KinematicCharacter {
     const R = physics.R;
     this.body = physics.world.createRigidBody(R.RigidBodyDesc.kinematicPositionBased().setTranslation(position.x, position.y + opts.height / 2, position.z));
     const halfHeight = Math.max(0.01, opts.height / 2 - opts.radius);
-    this.collider = physics.world.createCollider(R.ColliderDesc.capsule(halfHeight, opts.radius), this.body);
+    this.collider = physics.world.createCollider(R.ColliderDesc.capsule(halfHeight, opts.radius).setCollisionGroups(CHARACTER_GROUPS), this.body);
     this.controller = physics.world.createCharacterController(0.03);
     this.controller.enableAutostep(opts.stepHeight, 0.25, true);
     this.controller.setMaxSlopeClimbAngle((opts.maxSlopeDeg * Math.PI) / 180);

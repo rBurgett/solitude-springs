@@ -31,6 +31,28 @@ export interface StatsState {
   firearmsCaught: number;
   beerCasts: number;
   boatCatches: number;
+  // M2 (§11, §13)
+  timesRobbed: number;
+  timesStripped: number;
+  barrelsReceived: number;
+  abductions: number;
+  abductedMidConversation: number;
+  gatorBites: number;
+  fishLostToBears: number;
+  bearsScared: number;
+  gatorsScared: number;
+  partiesBroken: number;
+  tradesCompleted: number;
+  junkForTreasure: number;
+  zonesCleaned: number;
+  congas: number;
+  eventsSurvived: number;
+  grudgesHandled: number;
+  /** Day on which the player was robbed / stripped / lost fish to a bear (Worst Day Ever, §13). */
+  worstDayRobbed: number;
+  worstDayStripped: number;
+  worstDayBear: number;
+  deaths: number;
 }
 
 export function createJournal(): JournalState {
@@ -38,7 +60,11 @@ export function createJournal(): JournalState {
 }
 
 export function createStats(): StatsState {
-  return { fishCaught: 0, junkCaught: 0, clothingCaught: 0, castsMade: 0, treesHit: 0, bitesMissed: 0, cansCollected: 0, metresWalked: 0, bestFishLb: 0, nightCatches: 0, nibbleReels: 0, bootsCaught: 0, firearmsCaught: 0, beerCasts: 0, boatCatches: 0 };
+  return {
+    fishCaught: 0, junkCaught: 0, clothingCaught: 0, castsMade: 0, treesHit: 0, bitesMissed: 0, cansCollected: 0, metresWalked: 0, bestFishLb: 0, nightCatches: 0, nibbleReels: 0, bootsCaught: 0, firearmsCaught: 0, beerCasts: 0, boatCatches: 0,
+    timesRobbed: 0, timesStripped: 0, barrelsReceived: 0, abductions: 0, abductedMidConversation: 0, gatorBites: 0, fishLostToBears: 0, bearsScared: 0, gatorsScared: 0, partiesBroken: 0, tradesCompleted: 0, junkForTreasure: 0, zonesCleaned: 0, congas: 0, eventsSurvived: 0, grudgesHandled: 0,
+    worstDayRobbed: 0, worstDayStripped: 0, worstDayBear: 0, deaths: 0,
+  };
 }
 
 export interface CatchRecordResult {
@@ -58,6 +84,13 @@ export function recordCatch(j: JournalState, fishId: string, weightLb: number, n
   const newRecord = weightLb > cur.recordLb;
   if (newRecord) cur.recordLb = weightLb;
   return { newSpecies: false, newRecord };
+}
+
+/** Record a person met (first time only). Returns true when new. */
+export function recordPerson(j: JournalState, npcId: string): boolean {
+  if (j.people.includes(npcId)) return false;
+  j.people.push(npcId);
+  return true;
 }
 
 export function speciesSeen(j: JournalState): number {

@@ -25,8 +25,8 @@ function sample(): SaveRecord {
     character: { name: 'Ryaaaaaaan', sex: 'male', skin: 3, hairColor: '#3b2416', hairStyle: 'short', outfitColors: { tshirt: '#1aa7a1' } },
     player: { position: [12, 3.5, -40], facing: 1.2, health: 4, inBoat: false, inventory },
     world: { clock: { ...createClock(), day: 3 }, zones: { pool: { population: 0.8, trash: 0 }, sandy_bend: { population: 0.2, trash: 0.7 } }, boat: [1, 0, 2, 0.5], pickups: [{ id: 'p1', itemId: 'beer_can', count: 1, position: [1, 0, 1] }] },
-    npcs: {},
-    director: { wanted: 0, ufoRecentUntil: 0, lull: false },
+    npcs: { barb: { met: 2, robbed: 0, poofed: 1, relationship: 12, grudge: false, inventory: [{ id: 'lucky_lure', count: 1 }], stolen: [], lastSeenDay: 2, poofedAt: 2.5, flags: { poofGreeted: true } } },
+    director: { wanted: 0, ufoRecentUntil: 0, lull: false, sessionSeconds: 1200, cooldownsRemaining: { thief: 120 }, lullScheduledDay: 3, lullAtFraction: 0.4, recent: { party: 2.9 }, eventsRun: 4 },
     progress: { achievements: { first_catch: '2026-09-05T17:10:00.000Z' }, stats: { ...createStats(), fishCaught: 3 }, journal, serenity: 0.7 },
     rng: { seed: 123, state: 456 },
   };
@@ -68,6 +68,30 @@ test('garbage and malicious input are rejected or clamped', () => {
   assert.equal(v.progress.journal.species.dragon, undefined);
   assert.equal(v.progress.achievements['../../etc'], undefined);
   assert.equal(v.rng.seed, 0);
+  // unknown npc ids and event types are dropped; memories are clamped
+  const evil2 = JSON.parse(JSON.stringify(sample()));
+  evil2.npcs.dragon = { met: 1 };
+  evil2.npcs.barb.relationship = 9999;
+  evil2.npcs.barb.inventory = [{ id: 'plutonium', count: 1 }, { id: 'beer_can', count: 3 }];
+  evil2.director.cooldownsRemaining.volcano = 5;
+  const v2 = validateSave(evil2)!;
+  assert.equal(v2.npcs.dragon, undefined);
+  assert.equal(v2.npcs.barb?.relationship, 100);
+  assert.deepEqual(v2.npcs.barb?.inventory, [{ id: 'beer_can', count: 3 }]);
+  assert.equal((v2.director.cooldownsRemaining as Record<string, number>).volcano, undefined);
+});
+
+test('a version-1 save migrates to version 2 with empty memories', () => {
+  const v1 = JSON.parse(JSON.stringify(sample()));
+  v1.schemaVersion = 1;
+  v1.director = { wanted: 1, ufoRecentUntil: 3.5, lull: true };
+  delete v1.npcs;
+  const v = validateSave(v1)!;
+  assert.equal(v.schemaVersion, SCHEMA_VERSION);
+  assert.deepEqual(v.npcs, {});
+  assert.equal(v.director.wanted, 1);
+  assert.equal(v.director.ufoRecentUntil, 3.5);
+  assert.equal(v.director.lull, false);
 });
 
 test('names are sanitized', () => {

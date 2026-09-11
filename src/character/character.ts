@@ -103,6 +103,52 @@ export function loadCharacterAssets(sex: Sex): Promise<CharacterAssets> {
   return p;
 }
 
+/** The pity barrel (§11.4): a wooden barrel with two hoops and suspenders, modelled at the character's rest pose. */
+function makeBarrel(): THREE.Group {
+  const g = new THREE.Group();
+  const wood = new THREE.MeshStandardMaterial({ color: 0x8a6a4a, roughness: 0.9 });
+  const iron = new THREE.MeshStandardMaterial({ color: 0x3a3a3a, metalness: 0.7, roughness: 0.5 });
+  const body = new THREE.Mesh(new THREE.CylinderGeometry(0.3, 0.27, 0.78, 18, 1, true), wood);
+  body.position.y = 0.9;
+  body.castShadow = true;
+  body.material.side = THREE.DoubleSide;
+  g.add(body);
+  for (const y of [0.62, 0.9, 1.18]) {
+    const hoop = new THREE.Mesh(new THREE.TorusGeometry(y === 0.9 ? 0.305 : 0.285, 0.014, 8, 28), iron);
+    hoop.rotation.x = Math.PI / 2;
+    hoop.position.y = y;
+    g.add(hoop);
+  }
+  for (const x of [-0.11, 0.11]) {
+    const strap = new THREE.Mesh(new THREE.BoxGeometry(0.035, 0.34, 0.012), iron);
+    strap.position.set(x, 1.42, 0.13);
+    strap.rotation.x = 0.35;
+    g.add(strap);
+    const strapBack = new THREE.Mesh(new THREE.BoxGeometry(0.035, 0.34, 0.012), iron);
+    strapBack.position.set(x, 1.42, -0.13);
+    strapBack.rotation.x = -0.35;
+    g.add(strapBack);
+  }
+  return g;
+}
+
+/** The tinfoil hat: a crinkly cone on the head. */
+function makeTinfoilHat(): THREE.Group {
+  const g = new THREE.Group();
+  const geo = new THREE.ConeGeometry(0.115, 0.22, 9, 3);
+  const pos = geo.attributes.position as THREE.BufferAttribute;
+  for (let i = 0; i < pos.count; i++) {
+    const y = pos.getY(i);
+    if (y > -0.1) pos.setXYZ(i, pos.getX(i) * (1 + Math.sin(i * 12.9) * 0.05), y, pos.getZ(i) * (1 + Math.cos(i * 7.3) * 0.05));
+  }
+  geo.computeVertexNormals();
+  const hat = new THREE.Mesh(geo, new THREE.MeshStandardMaterial({ color: 0xd8dde6, metalness: 0.9, roughness: 0.25, flatShading: true }));
+  hat.position.y = 1.83;
+  hat.castShadow = true;
+  g.add(hat);
+  return g;
+}
+
 export class Character {
   readonly root: THREE.Group;
   readonly animator: Animator;
@@ -115,6 +161,8 @@ export class Character {
   private look: Look;
   private outfit: Outfit = {};
   private maskUniform = { value: new THREE.Vector2(0, 0) };
+  /** In-house garments with no MPFB mesh (the pity barrel, the tinfoil hat), attached to bones. */
+  private procedural = new Map<string, THREE.Object3D>();
 
   private constructor(assets: CharacterAssets, root: THREE.Group, look: Look) {
     this.assets = assets;
@@ -264,6 +312,25 @@ export class Character {
       if (m) m.visible = visible.has(id);
     }
     this.maskUniform.value.copy(this.maskFor(visible));
+    for (const id of ['barrel', 'tinfoil']) this.setProcedural(id, visible.has(id));
+  }
+
+  private setProcedural(id: string, on: boolean): void {
+    let obj = this.procedural.get(id);
+    if (!obj && !on) return;
+    if (!obj) {
+      obj = id === 'barrel' ? makeBarrel() : makeTinfoilHat();
+      this.procedural.set(id, obj);
+      const bone = this.bone(id === 'barrel' ? 'spine_02' : 'head');
+      if (bone) {
+        // express the garment in the bone's frame so it follows the animation
+        this.root.updateMatrixWorld(true);
+        const inv = new THREE.Matrix4().copy(bone.matrixWorld).invert().multiply(this.root.matrixWorld);
+        obj.applyMatrix4(inv);
+        bone.add(obj);
+      } else this.root.add(obj);
+    }
+    obj.visible = on;
   }
 
   setHair(style: string): void {
@@ -284,6 +351,7 @@ export class Character {
   setGarmentColor(id: string, hex: string): void {
     const m = this.meshes.get(`garment_${id}`);
     if (!m) return;
+    if (id === 'barrel' || id === 'tinfoil') return;
     for (const mat of Array.isArray(m.material) ? m.material : [m.material]) (mat as THREE.MeshStandardMaterial).color?.set(hex);
   }
 

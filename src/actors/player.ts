@@ -34,6 +34,8 @@ export class Player {
   fishing = false;
   /** Set while a full-body action (cast, sit, hit) owns the animation. */
   locked = false;
+  /** Set while an event moves the player directly (the tractor beam): physics and input skip. */
+  frozen = false;
   private world: World;
   private anim: PlayerAnim = 'idle';
   private landTimer = 0;

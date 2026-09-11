@@ -52,8 +52,8 @@ export const TUNABLES = {
     /** Population below this pushes fish share toward junk linearly. */
     lowPopulationShift: 0.5,
     luckyLureRareMultiplier: 1.25,
-    /** Rarity weights before zone/time filtering. */
-    rarityWeights: { common: 60, uncommon: 26, rare: 10, veryRare: 3, legendary: 1 },
+    /** Rarity weights before zone/time filtering. The legend only becomes eligible after the calm window (§9.4), so once it is, it dominates. */
+    rarityWeights: { common: 60, uncommon: 26, rare: 10, veryRare: 3, legendary: 400 },
   },
   /** §9.4 Old Gus. */
   legend: {
@@ -93,6 +93,10 @@ export const TUNABLES = {
   /** §12.4 health. */
   health: {
     maxHearts: 5,
+    /** Half a heart every 30 s after 10 s without damage. */
+    regenDelaySeconds: 10,
+    regenHalfHeartSeconds: 30,
+    respawnSerenity: 0.5,
   },
   /** §14.3 saving. */
   save: {
@@ -100,10 +104,104 @@ export const TUNABLES = {
     graceSecondsAfterLoad: 90,
     maxBytes: 5 * 1024 * 1024,
   },
-  /** §11 serenity (M1: passive regen only). */
+  /** §11.1 serenity (0..1 here; the HUD shows 0–100). */
   serenity: {
-    regenPerMinute: 0.04,
-    start: 0.7,
+    start: 0.6,
+    /** +1 point every 3 s while no NPC or animal is within `quietRadius` and no event is active. */
+    regenPerSecond: 1 / 300,
+    quietRadius: 30,
+    dropMinor: 0.15,
+    dropMajor: 0.4,
+    dropHurt: 0.1,
+  },
+  /** §11.2 the Annoyance Director. */
+  director: {
+    graceSecondsNewGame: 240,
+    graceSecondsAfterLoad: 90,
+    /** Mean gap between events ramps from `gapMeanStart` to `gapMeanEnd` over `rampSeconds` of session time. */
+    gapMeanStart: 150,
+    gapMeanEnd: 45,
+    rampSeconds: 30 * 60,
+    gapJitter: 0.4,
+    minGapAfterMinor: 25,
+    minGapAfterMajor: 60,
+    fishingOddsMultiplier: 1.3,
+    /** Roughly one lull per in-game day (none on day 1), 5–9 real minutes, unannounced. */
+    lullsPerDay: 1,
+    firstLullDay: 2,
+    lullMinSeconds: 300,
+    lullMaxSeconds: 540,
+    /** NPCs seen within this many in-game days are less likely to be picked again. */
+    recentNpcDays: 1,
+    returningStoryChance: 0.25,
+    /** Ambient passersby (wave/bark only) alongside an active event. */
+    ambientPasserbyChance: 0.15,
+    /** Wanted decay per in-game day and the ranger threshold (§12.3). */
+    wantedDecayPerDay: 1,
+    rangerWantedThreshold: 2,
+  },
+  /** §11.4 event behaviour. */
+  events: {
+    visitLingerMinSeconds: 60,
+    visitLingerMaxSeconds: 90,
+    visitGroupMax: 2,
+    thiefRummageSeconds: 3,
+    thiefGetawaySeconds: 40,
+    thiefItemsMin: 1,
+    thiefItemsMax: 4,
+    thiefSneakChance: 0.7,
+    partySeconds: 30,
+    partyRadius: 35,
+    partyCansMin: 15,
+    partyCansMax: 30,
+    partyGroupMin: 4,
+    partyGroupMax: 6,
+    bearWarningSeconds: 5,
+    bearSniffSeconds: 2.5,
+    gatorApproachMinSeconds: 3,
+    gatorApproachMaxSeconds: 4,
+    gatorLungeRange: 2.5,
+    gatorHeartsBank: 2,
+    gatorHeartsBoat: 1,
+    gatorKnockback: 3.5,
+    gatorMarshNightMultiplier: 2,
+    ufoOmenSeconds: 4,
+    ufoDescentSeconds: 5,
+    ufoBeamSeconds: 4,
+    ufoMissingHoursMin: 1,
+    ufoMissingHoursMax: 3,
+    ufoReturnSeconds: 3,
+    /** Glowing perch can bite for this many in-game days after an abduction. */
+    ufoGlowDays: 1,
+    /** Odd outfit pieces get this weight multiplier in the replacement roll. */
+    ufoOddPieceWeight: 4,
+    waterWalkerEmergeSeconds: 4,
+    grudgeReturnDays: 1,
+    /** How long a poofed NPC stays out of the pool (in-game days). */
+    poofReturnDays: 1,
+  },
+  /** §10 NPCs. */
+  npc: {
+    walkSpeed: 1.5,
+    jogSpeed: 3.0,
+    fleeSpeed: 3.6,
+    turnRate: 8,
+    talkDistance: 2.3,
+    interactRange: 3,
+    lookAtRange: 7,
+    maxActive: 12,
+    /** Animation update throttling beyond this distance (metres). */
+    farAnimDistance: 45,
+    despawnDistance: 140,
+  },
+  /** §10.3 trading. */
+  trade: {
+    wantMultiplier: 2,
+    favoriteMultiplier: 3,
+    dislikeMultiplier: 0.25,
+    /** Relationship bonus: value discount per relationship point. */
+    relationshipBonusPerPoint: 0.02,
+    relationshipPerTrade: 5,
   },
   /** §8.1 inventory. */
   inventory: {
@@ -114,6 +212,8 @@ export const TUNABLES = {
   ui: {
     toastSeconds: 4,
     typewriterCharsPerSecond: 40,
+    /** Voice blip every N typed characters. */
+    voiceBlipEveryChars: 3,
   },
 } as const;
 

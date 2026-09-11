@@ -22,9 +22,11 @@ const WORN: { slot: WornSlot; label: string }[] = [
 
 export function inventoryScreen(a: InventoryActions): { element: HTMLElement; refresh(): void } {
   const inv = a.inv;
+  // the tooltip lives inside the screen so it goes away with it however the screen closes (Esc, E, the button)
   const tooltip = el('div', { class: 'tooltip', hidden: true });
-  document.body.append(tooltip);
   let dragFrom: number | null = null;
+  /** Click-to-move: the slot picked up by a plain click (moves/swaps on the next click). */
+  let held: number | null = null;
   const showTip = (e: MouseEvent, s: ItemStack): void => {
     const d = itemDef(s.id);
     const extra = d.kind === 'clothing' ? el('div', {}, `Wear: ${d.slot}${s.color ? ` · ${s.color}` : ''} · double-click to equip`) : d.kind === 'consumable' ? el('div', {}, 'Double-click to use') : el('span', {});
@@ -38,7 +40,7 @@ export function inventoryScreen(a: InventoryActions): { element: HTMLElement; re
   };
   const slotEl = (index: number): HTMLElement => {
     const s = inv.slots[index];
-    const node = el('div', { class: `slot${index < HOTBAR ? ' hot' : ''}${index === inv.selected ? ' selected' : ''}`, 'data-slot': String(index), draggable: !!s });
+    const node = el('div', { class: `slot${index < HOTBAR ? ' hot' : ''}${index === inv.selected ? ' selected' : ''}${held === index ? ' held' : ''}`, 'data-slot': String(index), draggable: s ? 'true' : 'false' });
     if (s) {
       node.append(el('span', {}, itemIcon(s.id)));
       if (s.count > 1) node.append(el('span', { class: 'count' }, String(s.count)));
@@ -58,13 +60,26 @@ export function inventoryScreen(a: InventoryActions): { element: HTMLElement; re
           if (r.ok) change();
         } else if (d.kind === 'consumable') a.onUse(index);
       });
-      node.addEventListener('click', (e) => {
-        if (e.shiftKey) {
-          const empty = inv.slots.findIndex((x, i) => !x && i !== index);
-          if (empty >= 0 && splitSlot(inv, index, empty)) change();
-        }
-      });
     }
+    node.addEventListener('click', (e) => {
+      if (e.shiftKey && s) {
+        const empty = inv.slots.findIndex((x, i) => !x && i !== index);
+        if (empty >= 0 && splitSlot(inv, index, empty)) change();
+        return;
+      }
+      // click to pick up, click again to place (works everywhere drag-and-drop doesn't)
+      if (held === null) {
+        if (s) {
+          held = index;
+          refresh();
+        }
+      } else {
+        const from = held;
+        held = null;
+        if (from !== index) moveSlot(inv, from, index);
+        change();
+      }
+    });
     node.addEventListener('dragover', (e) => {
       e.preventDefault();
       node.classList.add('drag-over');
@@ -75,6 +90,7 @@ export function inventoryScreen(a: InventoryActions): { element: HTMLElement; re
       node.classList.remove('drag-over');
       const from = dragFrom ?? Number(e.dataTransfer?.getData('text/plain'));
       dragFrom = null;
+      held = null;
       if (Number.isInteger(from) && from !== index) {
         moveSlot(inv, from, index);
         change();
@@ -98,8 +114,18 @@ export function inventoryScreen(a: InventoryActions): { element: HTMLElement; re
       e.preventDefault();
       const from = dragFrom ?? Number(e.dataTransfer?.getData('text/plain'));
       dragFrom = null;
+      held = null;
       const st = inv.slots[from];
       if (st && itemDef(st.id).slot === w.slot && equipFromSlot(inv, from).ok) change();
+    });
+    // click-to-move onto a worn slot equips the held item
+    node.addEventListener('click', () => {
+      if (held === null) return;
+      const from = held;
+      held = null;
+      const st = inv.slots[from];
+      if (st && itemDef(st.id).slot === w.slot && equipFromSlot(inv, from).ok) change();
+      else refresh();
     });
     return node;
   };
@@ -122,9 +148,10 @@ export function inventoryScreen(a: InventoryActions): { element: HTMLElement; re
   const element = el('div', { class: 'screen dim' }, [
     el('div', { class: 'panel wide' }, [
       el('div', { class: 'row between' }, [el('h1', {}, 'Inventory'), el('button', { class: 'secondary small', onclick: () => { hideTip(); tooltip.remove(); a.onClose(); }, 'data-action': 'close' }, 'Close (E)')]),
-      el('p', { class: 'hint' }, 'Drag to move · shift-click to split · double-click to equip or use · the world keeps running.'),
+      el('p', { class: 'hint' }, 'Click an item, then click where it goes (or drag) · shift-click to split · double-click to equip or use · the world keeps running.'),
       el('div', { class: 'inventory' }, [el('div', {}, [el('h2', {}, 'Backpack'), backpack, el('h2', {}, 'Hotbar'), hotbar, dropZone]), right]),
     ]),
+    tooltip,
   ]);
   return { element, refresh };
 }

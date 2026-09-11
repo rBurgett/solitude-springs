@@ -50,7 +50,7 @@ export const ACHIEVEMENTS: readonly AchievementDef[] = [
   { id: 'trailway_robbery', name: 'Trailway Robbery', description: 'Rob someone.', category: 'social' },
   { id: 'most_wanted', name: 'Most Wanted', description: 'Have a ranger confiscate a weapon.', category: 'social' },
   { id: 'is_this_yours', name: 'Is This Yours?', description: "Return Lost Keys Larry's car keys.", category: 'social' },
-  { id: 'actual_solitude', name: 'Actual Solitude', description: 'Reach 100% serenity.', category: 'humor' },
+  { id: 'actual_solitude', name: 'Actual Solitude', description: 'Hold 100% serenity for three whole minutes.', category: 'humor' },
   { id: 'breezy', name: 'Breezy', description: "Wear a dress for a full in-game day as a character who didn't start in one.", category: 'humor' },
   { id: 'dapper', name: 'Dapper', description: "Wear a tuxedo for a full in-game day as a character who didn't start in one.", category: 'humor' },
   { id: 'dressed_by_the_river', name: 'Dressed by the River', description: 'Wear a full outfit made entirely of fished-up clothes.', category: 'humor' },

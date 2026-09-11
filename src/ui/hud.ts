@@ -41,8 +41,13 @@ export class Hud {
   private crosshair: HTMLElement;
   private clickToPlay: HTMLElement;
   private saveIcon: HTMLElement;
+  private bubbles: HTMLElement;
+  private ring: HTMLElement;
+  private ringFill: HTMLElement;
+  private narrator: HTMLElement;
   private areaTimer = 0;
   private lastArea = '';
+  private bubbleEls = new Map<string, { el: HTMLElement; until: number }>();
 
   constructor(parent: HTMLElement) {
     this.hearts = el('div', { class: 'hud-hearts', 'aria-label': 'Health' });
@@ -66,7 +71,14 @@ export class Hud {
     this.crosshair = el('div', { class: 'hud-crosshair', hidden: true });
     this.clickToPlay = el('div', { class: 'hud-click' }, 'Click to play');
     this.saveIcon = el('div', { class: 'hud-save', hidden: true }, '🍃');
+    this.bubbles = el('div', { class: 'hud-bubbles' });
+    this.ringFill = el('div', { class: 'hud-ring-fill' });
+    this.ring = el('div', { class: 'hud-ring', hidden: true }, [this.ringFill]);
+    this.narrator = el('div', { class: 'hud-narrator', hidden: true });
     this.root = el('div', { class: 'hud' }, [
+      this.bubbles,
+      this.ring,
+      this.narrator,
       el('div', { class: 'hud-topleft' }, [el('div', { class: 'hud-serenity', title: 'Serenity' }, [el('span', { class: 'hud-leaf' }, '🍃'), el('div', { class: 'hud-serenity-bar' }, [this.serenityFill]), this.serenityText])]),
       el('div', { class: 'hud-topright' }, [this.clock, this.day, this.saveIcon]),
       this.area,
@@ -83,11 +95,15 @@ export class Hud {
   }
 
   update(s: HudState, dt: number): void {
-    // hearts
+    // hearts (half hearts shown dimmed)
     const want = `${s.hearts}/${s.maxHearts}`;
     if (this.hearts.dataset.v !== want) {
       this.hearts.dataset.v = want;
-      this.hearts.replaceChildren(...Array.from({ length: s.maxHearts }, (_, i) => el('span', { class: i < Math.ceil(s.hearts) ? 'heart' : 'heart empty' }, i < Math.ceil(s.hearts) ? '♥' : '♡')));
+      this.hearts.replaceChildren(...Array.from({ length: s.maxHearts }, (_, i) => {
+        const full = s.hearts >= i + 1;
+        const half = !full && s.hearts > i;
+        return el('span', { class: full ? 'heart' : half ? 'heart half' : 'heart empty' }, full || half ? '♥' : '♡');
+      }));
     }
     this.serenityFill.style.width = `${Math.round(s.serenity * 100)}%`;
     this.serenityText.textContent = `${Math.round(s.serenity * 100)}%`;
@@ -137,6 +153,58 @@ export class Hud {
     const c = el('div', { class: 'hud-caption' }, text);
     this.captions.replaceChildren(c);
     setTimeout(() => c.remove(), 3500);
+  }
+
+  /** Narrator lines (the tutorial): a calm italic banner. */
+  narrate(text: string | null): void {
+    this.narrator.hidden = !text;
+    if (text) this.narrator.textContent = text;
+  }
+
+  /** A speech bubble keyed by owner; `screen` is the projected position (null = off-screen). */
+  bubble(key: string, text: string, seconds = 3): void {
+    let b = this.bubbleEls.get(key);
+    if (!b) {
+      b = { el: el('div', { class: 'hud-bubble', hidden: true }), until: 0 };
+      this.bubbles.append(b.el);
+      this.bubbleEls.set(key, b);
+    }
+    b.el.textContent = text;
+    b.until = performance.now() + seconds * 1000;
+  }
+
+  /** Move bubbles to their owners' screen positions; drop expired ones. */
+  placeBubbles(positions: Map<string, { x: number; y: number } | null>): void {
+    const now = performance.now();
+    for (const [key, b] of this.bubbleEls) {
+      const p = positions.get(key);
+      if (now > b.until || !p) {
+        b.el.hidden = true;
+        if (now > b.until) {
+          b.el.remove();
+          this.bubbleEls.delete(key);
+        }
+        continue;
+      }
+      b.el.hidden = false;
+      b.el.style.left = `${p.x}px`;
+      b.el.style.top = `${p.y}px`;
+    }
+  }
+
+  /** The rummaging progress ring above a thief (0..1); null hides it. */
+  setRing(p: { x: number; y: number; t: number } | null): void {
+    this.ring.hidden = !p;
+    if (p) {
+      this.ring.style.left = `${p.x}px`;
+      this.ring.style.top = `${p.y}px`;
+      this.ringFill.style.setProperty('--t', String(Math.round(p.t * 360)));
+    }
+  }
+
+  /** UFO omen glitch (skipped when Reduce flashing is on). */
+  setGlitch(on: boolean): void {
+    this.root.classList.toggle('glitch', on);
   }
 
   showArea(name: string): void {

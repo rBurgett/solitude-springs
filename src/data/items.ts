@@ -86,6 +86,17 @@ const BASE_ITEMS = [
   { id: 'lucky_lure', name: 'Lucky Lure', kind: 'misc', stack: 1, value: 12, description: 'Rare fish find it irresistible. So do thieves.' },
   { id: 'trash_bag', name: 'Trash Bag', kind: 'misc', stack: 1, value: 2, description: 'Cleaning counts double while you carry it.' },
   { id: 'headlamp', name: 'Headlamp', kind: 'clothing', stack: 1, value: 5, slot: 'hat', garment: 'fedora', emitsLight: true, palette: ['#2b2b2b'], description: 'For seeing. Also for being seen by aliens.' },
+  // --- M2 clothing: the pity barrel, the tinfoil hat and the wetsuit (§11.4; procedural meshes, see character.ts) ---
+  { id: 'barrel', name: 'Barrel', kind: 'clothing', stack: 1, value: 1, slot: 'full', garment: 'barrel', palette: ['#8a6a4a'], description: 'Suspenders included. Dignity not included.' },
+  { id: 'tinfoil_hat', name: 'Tinfoil Hat', kind: 'clothing', stack: 1, value: 2, slot: 'hat', garment: 'tinfoil', palette: ['#d8dde6'], description: 'Blocks the rays. Which rays? Exactly.' },
+  { id: 'wetsuit', name: 'Wetsuit', kind: 'clothing', stack: 1, value: 6, slot: 'full', garment: 'jumpsuit', palette: ['#1c1c1c', '#1f3550'], description: 'Somebody was down there a long time.' },
+  // --- M2 consumables and trade goods (§10.5) ---
+  { id: 'mre', name: 'MRE', kind: 'consumable', stack: 5, value: 3, heal: 2, description: 'Meal, Ready to Eat. Eventually.' },
+  { id: 'jerky', name: 'Homemade Jerky', kind: 'consumable', stack: 5, value: 3, heal: 1, description: "Jolene's recipe. Chewy for a reason." },
+  { id: 'mushrooms', name: 'Probably Fine Mushrooms', kind: 'consumable', stack: 5, value: 2, heal: 1, description: 'Rosa says they are probably fine.' },
+  { id: 'business_card', name: 'Business Card', kind: 'junk', stack: 10, value: 1, description: '"Velvet Vivian — Acquisitions." There is a lipstick mark.' },
+  { id: 'merit_badge', name: 'Merit Badge', kind: 'junk', stack: 10, value: 1, description: 'Awarded for standing there.' },
+  { id: 'vibes', name: 'Vibes', kind: 'junk', stack: 10, value: 2, description: 'Kai insists this is a real thing you can hold.' },
 ] as const satisfies readonly ItemDef[];
 
 const FISH_ITEMS: ItemDef[] = FISH.map((f) => ({
@@ -116,6 +127,7 @@ const ICONS: Record<string, string> = {
   old_rod: '🎣', old_boot: '🥾', glass_bottle: '🍾', message_bottle: '📜', beer_can: '🥫', rubber_duck: '🦆', traffic_cone: '🔶', garden_gnome: '🧙', smartphone: '📱', car_keys: '🔑', trophy: '🏆', toilet_seat: '🚽', bowling_ball: '🎳',
   pocket_knife: '🔪', handgun: '🔫', rifle: '🎯', pistol_ammo: '📦', rifle_ammo: '📦', bandage: '🩹', granola_bar: '🍫', burger: '🍔', pizza_slice: '🍕', lavender_oil: '🧴', lucky_lure: '🪝', trash_bag: '🗑️', headlamp: '🔦',
   fedora: '🎩', sneakers: '👟', hiking_boots: '🥾', flats: '🥿', short_dress: '👗', sundress: '👗', ball_gown: '👗', swimsuit: '🩱', tuxedo: '🤵', jumpsuit: '👽', tshirt: '👕', polo: '👕', tank_top: '🎽', sweater: '🧥', pants: '👖', cargo_pants: '👖', shorts: '🩳', sweatpants: '👖',
+  barrel: '🛢️', tinfoil_hat: '🥫', wetsuit: '🤿', mre: '🥫', jerky: '🥩', mushrooms: '🍄', business_card: '💳', merit_badge: '🎖️', vibes: '✨',
 };
 
 /** Emoji glyph for the hotbar and inventory. */
@@ -128,5 +140,7 @@ export function itemIcon(id: string): string {
 
 /** Junk items that can be fished up (cans included, they count as junk in the catch table). */
 export const FISHABLE_JUNK: readonly string[] = ['old_boot', 'glass_bottle', 'message_bottle', 'beer_can', 'rubber_duck', 'traffic_cone', 'garden_gnome', 'smartphone', 'car_keys', 'trophy', 'toilet_seat', 'bowling_ball'];
+/** Odd pieces the aliens favour when replacing an abductee's outfit (§11.4). */
+export const ODD_CLOTHING: readonly string[] = ['jumpsuit', 'tinfoil_hat', 'ball_gown', 'tuxedo', 'wetsuit', 'swimsuit', 'barrel'];
 /** Clothing that can be fished up. */
 export const FISHABLE_CLOTHING: readonly string[] = ['tshirt', 'polo', 'tank_top', 'sweater', 'pants', 'cargo_pants', 'shorts', 'sweatpants', 'short_dress', 'sundress', 'ball_gown', 'swimsuit', 'tuxedo', 'sneakers', 'hiking_boots', 'flats', 'fedora'];

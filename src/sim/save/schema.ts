@@ -2,8 +2,10 @@
 import type { InventoryState } from '../inventory.ts';
 import type { ClockState } from '../clock.ts';
 import type { JournalState, StatsState } from '../journal.ts';
+import type { NpcMemory } from '../npcMemory.ts';
+import type { DirectorSave } from '../director.ts';
 
-export const SCHEMA_VERSION = 1;
+export const SCHEMA_VERSION = 2;
 
 export interface CharacterRecord {
   name: string;
@@ -25,6 +27,8 @@ export interface PickupRecord {
 export interface ZoneRecord {
   population: number;
   trash: number;
+  /** Where the trash visuals are centred (a party spot); defaults to the zone centre. */
+  trashCenter?: [number, number];
 }
 
 export interface SaveRecord {
@@ -48,12 +52,8 @@ export interface SaveRecord {
     boat: [number, number, number, number] | null;
     pickups: PickupRecord[];
   };
-  npcs: Record<string, unknown>;
-  director: {
-    wanted: number;
-    ufoRecentUntil: number;
-    lull: boolean;
-  };
+  npcs: Record<string, NpcMemory>;
+  director: DirectorSave;
   progress: {
     achievements: Record<string, string>;
     stats: StatsState;

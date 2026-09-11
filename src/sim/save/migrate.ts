@@ -7,6 +7,12 @@ type Migration = (v: Record<string, unknown>) => Record<string, unknown>;
 const MIGRATIONS: Record<number, Migration> = {
   // 0 → 1: pre-release saves had no schemaVersion; nothing else to convert.
   0: (v) => ({ ...v, schemaVersion: 1 }),
+  // 1 → 2 (M2): npc memories, the director's pacing state and new stats. Old fields carry over;
+  // missing ones take their defaults in validation.
+  1: (v) => {
+    const d = (typeof v.director === 'object' && v.director !== null ? v.director : {}) as Record<string, unknown>;
+    return { ...v, schemaVersion: 2, npcs: {}, director: { wanted: d.wanted ?? 0, ufoRecentUntil: d.ufoRecentUntil ?? 0, lull: false, sessionSeconds: 0, cooldownsRemaining: {}, lullScheduledDay: 0, lullAtFraction: -1, recent: {}, eventsRun: 0 } };
+  },
 };
 
 /** Upgrade to the current schema. Returns null for a future version we can't read. */

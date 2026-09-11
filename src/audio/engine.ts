@@ -182,4 +182,66 @@ export class AudioEngine {
   save(): void {
     this.tone('interface', 880, 'sine', 0.08, 0.01, 0.2, { slideTo: 1320 });
   }
+  // ---- M2 events (§15 "Events") ----
+  rustle(): void {
+    this.burst('effects', 0.16, 0.05, 0.35, 2600, 0.5);
+    this.burst('effects', 0.1, 0.2, 0.3, 1800, 0.7, this.now + 0.25);
+  }
+  softFootstep(): void {
+    this.burst('effects', 0.05, 0.004, 0.05, 900, 0.9);
+  }
+  brushCrash(): void {
+    const t = this.now;
+    for (let i = 0; i < 4; i++) this.burst('effects', 0.35, 0.02, 0.3, 700 + i * 300, 0.5, t + i * 0.22);
+    this.tone('effects', 70, 'sawtooth', 0.15, 0.05, 0.6, { slideTo: 45, at: t });
+  }
+  bearRoar(): void {
+    const t = this.now;
+    this.tone('effects', 90, 'sawtooth', 0.45, 0.08, 0.9, { slideTo: 60, at: t });
+    this.tone('effects', 135, 'square', 0.2, 0.08, 0.8, { slideTo: 95, at: t });
+    this.burst('effects', 0.3, 0.05, 0.8, 400, 0.4, t);
+  }
+  bearHuff(): void {
+    this.burst('effects', 0.3, 0.02, 0.25, 500, 0.6);
+    this.burst('effects', 0.2, 0.02, 0.2, 450, 0.6, this.now + 0.3);
+  }
+  bearSwipe(): void {
+    this.burst('effects', 0.4, 0.01, 0.18, 1600, 0.6);
+    this.tone('effects', 240, 'triangle', 0.2, 0.01, 0.2, { slideTo: 120 });
+  }
+  gatorHiss(): void {
+    this.burst('effects', 0.25, 0.1, 0.9, 3200, 0.3);
+  }
+  gatorSnap(): void {
+    this.tone('effects', 180, 'square', 0.5, 0.004, 0.09, { slideTo: 60 });
+    this.burst('effects', 0.5, 0.005, 0.2, 900, 0.8);
+  }
+  bigSplash(): void {
+    this.burst('effects', 0.6, 0.03, 0.7, 600, 0.5);
+    this.burst('effects', 0.3, 0.1, 0.9, 1400, 0.4, this.now + 0.1);
+    this.tone('effects', 300, 'sine', 0.2, 0.02, 0.3, { slideTo: 120 });
+  }
+  rise(): void {
+    this.burst('effects', 0.35, 0.3, 1.5, 800, 0.4);
+    this.tone('effects', 120, 'sine', 0.15, 0.3, 1.5, { slideTo: 240 });
+  }
+  glitch(): void {
+    const t = this.now;
+    for (let i = 0; i < 5; i++) this.tone('effects', 800 + Math.random() * 2400, 'square', 0.06, 0.003, 0.03, { at: t + i * 0.05 });
+  }
+  clickOn(): void {
+    this.tone('effects', 1200, 'square', 0.08, 0.002, 0.02);
+  }
+  hurt(): void {
+    this.tone('effects', 220, 'square', 0.35, 0.005, 0.18, { slideTo: 110 });
+    this.burst('effects', 0.2, 0.01, 0.15, 1200, 0.7);
+  }
+  scatter(): void {
+    const t = this.now;
+    for (let i = 0; i < 6; i++) this.tone('ambience', 2200 + Math.random() * 1500, 'sine', 0.05, 0.01, 0.08, { slideTo: 3000, at: t + i * 0.06 });
+  }
+  /** Reel spinning on its own (the rod auto-reels under the saucer). */
+  cheer(): void {
+    this.burst('effects', 0.2, 0.05, 0.5, 1500, 0.5);
+  }
 }
