@@ -72,6 +72,7 @@ This plan was written from a design conversation with the owner. Everything deci
 - 2026-09-11 — M0 checkpoint: owner chose MPFB2, confirmed the setting, specified the underwear layer and asked for the Quaternius-quality walk on the MPFB rig (§1 #25–28); §22 items 1–3 resolved; M1 build list amended.
 - 2026-09-11 — M0 built (§0.1 current state, §20 M0 status). Recorded tool versions (§4.5), the M0 character findings (§4.3), allowlist additions `@types/node` and `@dgreenheck/ez-tree` (§3.3), asset notes (§23) and the implementer's recommendation for the checkpoint (§22).
 - 2026-09-11 — M0 committed (`3ef726b`). Owner said to start M1.
+- 2026-09-11 — M1 committed (`7a2d82e`). First owner play feedback recorded (§1 #29–30) and fixed: bite delay 10–40 s; the player no longer creeps down slopes while standing (horizontal position frozen when idle and grounded; 1 m physics heightfield; gentler deep-water push); bridges no longer count as wading (depth is measured from the feet, not the terrain under the deck — this also fixed the stall mid-bridge); the sprint's torso lean is scaled down in the retarget (`lean` per clip).
 - 2026-09-11 — M1 built (§0.1 current state, §20 M1 status). Recorded the animation retargeting method and the authored clips (§4.4), the player-body pipeline findings (§4.3), the layout resolution rule (§7.1), perf numbers (§17), and the M1 checkpoint asks (§22). No new dependencies.
 
 ---
@@ -108,6 +109,8 @@ This plan was written from a design conversation with the owner. Everything deci
 | 26 | Underwear base layer | Male: **white boxers with red spots** (a polka-dot texture on the shorts, not plain white). Female: **white bra + white boy shorts cut like the male's M0 shorts** (`cortu_jeans_shorts` recoloured), not panties. |
 | 27 | Setting | **Southeastern spring-fed river valley confirmed** ("the setting looks good"). |
 | 28 | Alligator | Owner gave no preference at M0; the plan's default stands: **in-house model** (Blender script + ambientCG textures), built in M2. |
+| 29 | Bite timing (M1 feedback, 2026-09-11) | Waits were too long: bite delay is now **10–40 s** (triangular, mode 20 s) instead of 15–90 s. |
+| 30 | Movement feel (M1 feedback) | The player must not creep down slopes while standing; bridges must not slow the player like wading; the sprint must not double over. |
 
 ---
 
@@ -556,7 +559,7 @@ A zone with low population shifts share from fish to junk. A trashed zone yields
 
 ### 9.2 Waiting and biting *(all tunable)*
 
-- **Bite delay:** random 15–90 s (triangular distribution, mode 40 s), multiplied by zone population:
+- **Bite delay:** random 10–40 s (triangular distribution, mode 20 s; owner decision §1 #29, was 15–90), multiplied by zone population:
   - below 50%: delay ×1.5
   - 0%: no bites at all (the float just sits there).
 - **Nibbles:** 0–2 fake-out twitches before a real bite. Reeling on a nibble counts as reeling early.
@@ -1359,7 +1362,7 @@ Each milestone ends at a **checkpoint**: the implementer runs §19, sends the ev
 
 ### M0 — Foundations & look-dev *(decision gate)*
 
-**Status (2026-09-11): built; checkpoint pending.** Evidence: `npm ci`, `typecheck`, `test` (12 pass), `deps:check` (72 resolved versions, oldest-new 16 days) and `build` pass; `npm run smoke` passes (boot page + three lab pages, no console errors, Chromium closed over CDP); 15 bake-off + 8 vignette screenshots in `shots-out/m0/`. Known gaps carried into M1: production bundle copies all of `public/` (164 MB with the bake-off GLBs; trim before shipping), vignette draw is ~6.7 M triangles/frame on the RTX 4050 with shadows (needs LODs/impostors for the Iris Xe budget), no `perf` tool yet.
+**Status (2026-09-11): built; checkpoint in progress** — the owner's first play notes (§1 #29–30) are fixed and re-verified (smoke passes, 50-spot standing-drift probe clean). Evidence: `npm ci`, `typecheck`, `test` (12 pass), `deps:check` (72 resolved versions, oldest-new 16 days) and `build` pass; `npm run smoke` passes (boot page + three lab pages, no console errors, Chromium closed over CDP); 15 bake-off + 8 vignette screenshots in `shots-out/m0/`. Known gaps carried into M1: production bundle copies all of `public/` (164 MB with the bake-off GLBs; trim before shipping), vignette draw is ~6.7 M triangles/frame on the RTX 4050 with shadows (needs LODs/impostors for the Iris Xe budget), no `perf` tool yet.
 
 **Build**
 
@@ -1386,7 +1389,7 @@ Each milestone ends at a **checkpoint**: the implementer runs §19, sends the ev
 
 ### M1 — "Tranquil" vertical slice
 
-**Status (2026-09-11): built; checkpoint pending.** Evidence: `npm ci`, `typecheck`, `test` (42 pass), `deps:check` (all ≥ 14 d) and `build` pass; `npm run smoke --gpu` plays the whole acceptance path below with zero console errors (screenshots `smoke-out/01…15`); `npm run perf --preset=medium` on the Iris Xe: 50–60 fps, worst p95 21 ms (§17). Look-dev evidence: `shots-out/m1-anim/*` (retargeted clips on both bodies), `shots-out/m1-player/*` (underwear layer, wardrobe, skins, hair), `shots-out/m1-map/*` (overhead + vistas).
+**Status (2026-09-11): built; checkpoint in progress** — the owner's first play notes (§1 #29–30) are fixed and re-verified (smoke passes, 50-spot standing-drift probe clean). Evidence: `npm ci`, `typecheck`, `test` (42 pass), `deps:check` (all ≥ 14 d) and `build` pass; `npm run smoke --gpu` plays the whole acceptance path below with zero console errors (screenshots `smoke-out/01…15`); `npm run perf --preset=medium` on the Iris Xe: 50–60 fps, worst p95 21 ms (§17). Look-dev evidence: `shots-out/m1-anim/*` (retargeted clips on both bodies), `shots-out/m1-player/*` (underwear layer, wardrobe, skins, hair), `shots-out/m1-map/*` (overhead + vistas).
 Acceptance not fully met: **60 fps Medium on Iris Xe** — four of six stations hit 60, the spring pool sits at 50 fps / p95 21 ms. Known gaps carried forward: production bundle copies all of `public/` (222 MB; needs a manifest-driven copy and texture compression), no cascaded shadows (shadows only within ±40 m of the player), impostor trees are flat billboards, the rod/bobber/pickups are placeholder geometry, no recorded ambience (§22 #4), the bridge decks have no sway, fish have no in-hand model (the reveal is a hold-up animation + toast).
 
 **Build**

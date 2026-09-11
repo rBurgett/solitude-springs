@@ -23,9 +23,9 @@ export const TUNABLES = {
   },
   /** §9.2 waiting and biting. */
   bite: {
-    delayMinSeconds: 15,
-    delayMaxSeconds: 90,
-    delayModeSeconds: 40,
+    delayMinSeconds: 10,
+    delayMaxSeconds: 40,
+    delayModeSeconds: 20,
     lowPopulationThreshold: 0.5,
     lowPopulationDelayMultiplier: 1.5,
     nibblesMax: 2,
@@ -65,7 +65,7 @@ export const TUNABLES = {
     wadeMaxDepth: 0.8,
     wadeSpeedFactor: 0.55,
     boatMinDepth: 0.5,
-    pushBackStrength: 2.5,
+    pushBackStrength: 1.6,
   },
   /** §6 / §5 movement. */
   movement: {

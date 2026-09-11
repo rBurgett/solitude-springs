@@ -88,7 +88,7 @@ export class World {
     progress('Settling the ground', 0.88);
     const R = await initRapier();
     const physics = new PhysicsWorld(R);
-    physics.addHeightfield(grid, 2);
+    physics.addHeightfield(grid, 1); // 1 m: the collider matches the visual terrain (coarser facets made banks steeper than they look)
     for (const b of bridges) {
       const center = b.from.clone().lerp(b.to, 0.5);
       const len = b.from.distanceTo(b.to);

@@ -293,6 +293,9 @@ def retarget_clip(entry):
     n = f1 - f0 + 1
     S_rot, S_pos, mapping, align = src['S_rot'], src['S_pos'], src['mapping'], src['align']
     hip_scale = src['hip_scale']
+    # optional torso lean reduction: the spine chain's world delta is scaled toward identity
+    lean = float(entry.get('lean', 1.0))
+    lean_bones = {'pelvis', 'spine_01', 'spine_02', 'spine_03', 'neck_01'} if lean < 0.999 else set()
     src_pb = {pb.name: pb for pb in arm.pose.bones}
     mw = arm.matrix_world
     tact = ensure_action(tgt_arm, entry['name'])
@@ -308,6 +311,8 @@ def retarget_clip(entry):
                 continue
             Sf = (mw @ src_pb[sname].matrix).to_quaternion()
             D = Sf @ S_rot[sname].inverted()
+            if b.name in lean_bones:
+                D = Quaternion().slerp(D, lean)
             world_rot[b.name] = D @ align[b.name] @ T_rot[b.name]
         sp = (mw @ src_pb[mapping['pelvis']].matrix).translation
         dp = (sp - S_pos[mapping['pelvis']]) * hip_scale

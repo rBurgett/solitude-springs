@@ -1,5 +1,5 @@
 {
-  "$comment": "Animation library for the MPFB game_engine rig (plan §4.4). Every clip is retargeted from the CC0 Quaternius Universal Animation Library (owner decision §1 #25) by assets-src/characters/blender/retarget.py. `name` is the runtime clip id; `source` the UAL file key; `clip` the glTF animation name in that file. `loop` marks cycles. Hand-authored clips (cast, reel…) are defined in poses.json and baked by the same script.",
+  "$comment": "Animation library for the MPFB game_engine rig (plan §4.4). Every clip is retargeted from the CC0 Quaternius Universal Animation Library (owner decision §1 #25) by assets-src/characters/blender/retarget.py. `name` is the runtime clip id; `source` the UAL file key; `clip` the glTF animation name in that file. `loop` marks cycles; `lean` (0..1) scales the torso's rotation away from rest (the Quaternius sprint doubles over). Hand-authored clips (cast, reel…) are defined in poses.json and baked by the same script.",
   "sources": {
     "ual1": "public/assets/fetched/quaternius/ual1/UAL1_Standard.glb",
     "ual2": "public/assets/fetched/quaternius/ual2/UAL2_Standard.glb"
@@ -15,7 +15,7 @@
     { "name": "walk_formal", "source": "ual1", "clip": "Walk_Formal_Loop", "loop": true },
     { "name": "walk_carry", "source": "ual2", "clip": "Walk_Carry_Loop", "loop": true },
     { "name": "jog", "source": "ual1", "clip": "Jog_Fwd_Loop", "loop": true },
-    { "name": "sprint", "source": "ual1", "clip": "Sprint_Loop", "loop": true },
+    { "name": "sprint", "source": "ual1", "clip": "Sprint_Loop", "loop": true, "lean": 0.45 },
     { "name": "crouch_idle", "source": "ual1", "clip": "Crouch_Idle_Loop", "loop": true },
     { "name": "crouch_walk", "source": "ual1", "clip": "Crouch_Fwd_Loop", "loop": true },
     { "name": "jump_start", "source": "ual1", "clip": "Jump_Start" },

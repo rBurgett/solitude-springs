@@ -76,8 +76,9 @@ export class Player {
   step(dt: number, intent: MoveIntent, basis: { forward: THREE.Vector3; right: THREE.Vector3 }, elapsed: number): void {
     const w = this.world;
     const p = this.position;
-    // wading: depth at the feet from the water surface
-    this.depth = w.waterDepthAt(p.x, p.z);
+    // wading: how far the feet are below the water surface (y = 0) while over the river; a bridge deck
+    // or the dock above the water counts as dry
+    this.depth = w.valley.edgeDistance(p.x, p.z) < 0 ? Math.max(0, -p.y) : 0;
     const wading = this.depth > 0.05;
     const tooDeep = this.depth > W.wadeMaxDepth;
     // desired horizontal velocity
@@ -92,11 +93,11 @@ export class Player {
     const k = 1 - Math.exp(-M.acceleration * dt);
     this.velocity.x += (targetVx - this.velocity.x) * k;
     this.velocity.z += (targetVz - this.velocity.z) * k;
-    // deep water pushes the player back toward the bank (§7.2)
+    // deep water gently pushes the player back toward the bank (§7.2)
     if (tooDeep) {
       const cx = w.valley.riverCenterX(p.z);
       const away = Math.sign(p.x - cx) || 1;
-      this.velocity.x += away * W.pushBackStrength * dt * 4;
+      this.velocity.x += away * W.pushBackStrength * dt;
       if (elapsed - this.lastDeepAt > 6) {
         this.lastDeepAt = elapsed;
         this.onTooDeep();
@@ -121,8 +122,23 @@ export class Player {
     }
     this.velocity.y += M.gravity * dt;
     if (this.grounded && this.velocity.y < 0) this.velocity.y = -2; // keep pressing into the ground for snapping
+    // standing still: no horizontal motion at all, so slopes never creep the player around (§1 #30)
+    const standing = mag < 0.01 && this.grounded && !tooDeep && !push;
+    if (standing) {
+      this.velocity.x = 0;
+      this.velocity.z = 0;
+    }
     const desired = new THREE.Vector3(this.velocity.x * dt, this.velocity.y * dt, this.velocity.z * dt);
+    const before = this.body.position.clone();
     const moved = this.body.move(desired);
+    if (standing && this.body.grounded) {
+      const now = this.body.position;
+      if (Math.abs(now.x - before.x) > 1e-6 || Math.abs(now.z - before.z) > 1e-6) {
+        this.body.setPosition(new THREE.Vector3(before.x, now.y, before.z));
+        moved.x = 0;
+        moved.z = 0;
+      }
+    }
     const wasGrounded = this.grounded;
     this.grounded = this.body.grounded;
     if (this.grounded) {
