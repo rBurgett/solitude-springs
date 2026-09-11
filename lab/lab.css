@@ -1,0 +1,4 @@
+html, body { margin: 0; background: #1b1e26; color: #dde; font: 13px/1.4 system-ui, sans-serif; }
+#lab-canvas { display: block; width: 1280px; height: 720px; }
+#caption { position: fixed; left: 10px; bottom: 8px; padding: 4px 8px; background: rgba(0,0,0,0.55); border-radius: 4px; pointer-events: none; white-space: pre-wrap; max-width: 1200px; }
+#caption b { color: #ffd166; }

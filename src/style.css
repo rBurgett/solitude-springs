@@ -1,0 +1,47 @@
+:root {
+  --cream: #f6efe2;
+  --ink: #2c3a2e;
+  --moss: #4f7a4a;
+  --sun: #e5b25d;
+  color-scheme: light;
+}
+html,
+body {
+  margin: 0;
+  height: 100%;
+  background: #0d1a14;
+  color: var(--cream);
+  font: 16px/1.5 Georgia, 'Times New Roman', serif;
+  overflow: hidden;
+}
+#app {
+  position: fixed;
+  inset: 0;
+}
+.placeholder {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  text-align: center;
+  background: radial-gradient(ellipse at 50% 30%, #1d3b2b 0%, #0d1a14 70%);
+}
+.placeholder h1 {
+  font-weight: normal;
+  font-size: 3rem;
+  margin: 0 0 0.25rem;
+  letter-spacing: 0.04em;
+}
+.placeholder p {
+  margin: 0;
+  font-style: italic;
+  color: var(--sun);
+}
+.placeholder nav {
+  margin-top: 2rem;
+  font: 14px system-ui, sans-serif;
+}
+.placeholder nav a {
+  color: var(--cream);
+  margin: 0 0.75rem;
+}

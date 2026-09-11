@@ -1,0 +1,59 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Solitude Springs — M0 look-dev index</title>
+    <link rel="icon" href="../favicon.svg" type="image/svg+xml" />
+    <style>
+      body { margin: 0; padding: 24px; background: #f6efe2; color: #2c3a2e; font: 15px/1.5 Georgia, serif; }
+      h1 { font-weight: normal; margin: 0 0 4px; }
+      h2 { font-weight: normal; margin: 24px 0 8px; border-bottom: 1px solid #c9bda6; }
+      p { margin: 0 0 8px; max-width: 70ch; }
+      table { border-collapse: collapse; }
+      td, th { padding: 4px 12px 4px 0; text-align: left; vertical-align: top; }
+      a { color: #2f5d8a; }
+      code { font: 13px ui-monospace, monospace; background: #ece3d0; padding: 1px 4px; border-radius: 3px; }
+    </style>
+  </head>
+  <body>
+    <h1>Solitude Springs — M0 look-dev</h1>
+    <p>Every page renders live (1280×720 canvas). Each opens in a new tab. Pages take a few seconds to load the first time.</p>
+
+    <h2>Character bake-off (plan §4.3) — pick one family</h2>
+    <p>Same figures, same lighting for each candidate. Add <code>&amp;time=dusk</code> to any link for golden-hour light.</p>
+    <table>
+      <tr><th>Candidate</th><th>Default outfits</th><th>Underwear</th><th>Male in the dress</th><th>Walk cycle</th><th>Cast pose</th></tr>
+      <tr><td>A — MPFB2 (MakeHuman)</td>
+        <td><a target="_blank" href="characters.html?candidate=a&shot=lineup">lineup</a></td>
+        <td><a target="_blank" href="characters.html?candidate=a&shot=underwear">underwear</a></td>
+        <td><a target="_blank" href="characters.html?candidate=a&shot=dress">dress</a></td>
+        <td><a target="_blank" href="characters.html?candidate=a&shot=walk">walk</a></td>
+        <td><a target="_blank" href="characters.html?candidate=a&shot=cast">cast</a></td></tr>
+      <tr><td>B — Quaternius</td>
+        <td><a target="_blank" href="characters.html?candidate=b&shot=lineup">lineup</a></td>
+        <td><a target="_blank" href="characters.html?candidate=b&shot=underwear">underwear</a></td>
+        <td><a target="_blank" href="characters.html?candidate=b&shot=dress">dress</a></td>
+        <td><a target="_blank" href="characters.html?candidate=b&shot=walk">walk</a></td>
+        <td><a target="_blank" href="characters.html?candidate=b&shot=cast">cast</a></td></tr>
+      <tr><td>C — Florida Driver procedural (baseline)</td>
+        <td><a target="_blank" href="characters.html?candidate=c&shot=lineup">lineup</a></td>
+        <td><a target="_blank" href="characters.html?candidate=c&shot=underwear">underwear</a></td>
+        <td><a target="_blank" href="characters.html?candidate=c&shot=dress">dress</a></td>
+        <td><a target="_blank" href="characters.html?candidate=c&shot=walk">walk</a></td>
+        <td><a target="_blank" href="characters.html?candidate=c&shot=cast">cast</a></td></tr>
+    </table>
+
+    <h2>Riverbank vignette (setting + art direction)</h2>
+    <table>
+      <tr><th>Time</th><th>Clean</th><th>Trashed after a party</th></tr>
+      <tr><td>Dawn</td><td><a target="_blank" href="vignette.html?time=dawn&state=clean">open</a></td><td><a target="_blank" href="vignette.html?time=dawn&state=trashed">open</a></td></tr>
+      <tr><td>Day</td><td><a target="_blank" href="vignette.html?time=day&state=clean">open</a></td><td><a target="_blank" href="vignette.html?time=day&state=trashed">open</a></td></tr>
+      <tr><td>Dusk</td><td><a target="_blank" href="vignette.html?time=dusk&state=clean">open</a></td><td><a target="_blank" href="vignette.html?time=dusk&state=trashed">open</a></td></tr>
+      <tr><td>Night</td><td><a target="_blank" href="vignette.html?time=night&state=clean">open</a></td><td><a target="_blank" href="vignette.html?time=night&state=trashed">open</a></td></tr>
+    </table>
+
+    <h2>Decisions this checkpoint asks for (plan §22)</h2>
+    <p>1. Character family (A, B or other). 2. Setting: Southeastern springs forest or generic northern woods. 3. Alligator: in-house model or sourced. Plus any art-direction notes.</p>
+  </body>
+</html>

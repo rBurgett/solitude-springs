@@ -1,0 +1,36 @@
+{
+  "name": "solitude-springs",
+  "private": true,
+  "version": "0.0.1",
+  "description": "Solitude Springs - A Tranquil Fishing Experience (it is not).",
+  "type": "module",
+  "license": "Apache-2.0",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "typecheck": "tsc --noEmit",
+    "test": "node --test \"tests/**/*.test.ts\"",
+    "deps:check": "node tools/check-deps-age.mjs",
+    "assets": "node tools/fetch-assets.mjs",
+    "smoke": "node tools/smoke.mjs",
+    "shots": "node tools/shots.mjs",
+    "perf": "node tools/perf.mjs",
+    "simulate": "node tools/simulate.ts"
+  },
+  "engines": {
+    "node": ">=24",
+    "npm": ">=11.10.0"
+  },
+  "dependencies": {
+    "@dimforge/rapier3d-compat": "0.20.0",
+    "three": "0.185.1"
+  },
+  "devDependencies": {
+    "@dgreenheck/ez-tree": "1.1.0",
+    "@types/node": "24.13.3",
+    "@types/three": "0.185.4",
+    "typescript": "7.0.2",
+    "vite": "8.2.2"
+  }
+}

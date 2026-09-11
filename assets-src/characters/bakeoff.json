@@ -1,0 +1,205 @@
+{
+  "$comment": "M0 bake-off figures for candidate A (plan \u00a74.3). Sliders per \u00a75: male ~1.83 m, broad, muscular but not huge; female ~1.65 m, athletic.",
+  "figures": [
+    {
+      "name": "male_default",
+      "macro": {
+        "gender": 1.0,
+        "age": 0.5,
+        "muscle": 0.62,
+        "weight": 0.5,
+        "proportions": 0.72,
+        "height": 0.56,
+        "race": {
+          "caucasian": 1.0,
+          "african": 0.0,
+          "asian": 0.0
+        }
+      },
+      "rig": "game_engine",
+      "skin": "young_caucasian_male",
+      "eyes": "low-poly",
+      "eyebrows": "eyebrow001",
+      "eyelashes": "eyelashes01",
+      "hair": "short02",
+      "clothes": [
+        "elvs_crude_t-shirt_male",
+        "toigo_wool_pants",
+        "shoes02"
+      ],
+      "materials": {
+        "elvs_crude_t-shirt_male": {
+          "color": [
+            0.1,
+            0.55,
+            0.5,
+            1.0
+          ]
+        },
+        "toigo_wool_pants": {
+          "color": [
+            0.16,
+            0.2,
+            0.32,
+            1.0
+          ]
+        }
+      }
+    },
+    {
+      "name": "female_default",
+      "macro": {
+        "gender": 0.0,
+        "age": 0.5,
+        "muscle": 0.55,
+        "weight": 0.45,
+        "proportions": 0.42,
+        "height": 0.55,
+        "cupsize": 0.6,
+        "firmness": 0.7,
+        "race": {
+          "caucasian": 1.0,
+          "african": 0.0,
+          "asian": 0.0
+        }
+      },
+      "rig": "game_engine",
+      "skin": "young_caucasian_female",
+      "eyes": "low-poly",
+      "eyebrows": "eyebrow002",
+      "eyelashes": "eyelashes02",
+      "hair": "ponytail01",
+      "clothes": [
+        "toigo_shift_dress",
+        "toigo_ballet_flats"
+      ],
+      "materials": {
+        "toigo_shift_dress": {
+          "color": [
+            0.85,
+            0.25,
+            0.45,
+            1.0
+          ]
+        }
+      }
+    },
+    {
+      "name": "male_underwear",
+      "macro": {
+        "gender": 1.0,
+        "age": 0.5,
+        "muscle": 0.62,
+        "weight": 0.5,
+        "proportions": 0.72,
+        "height": 0.56,
+        "race": {
+          "caucasian": 1.0,
+          "african": 0.0,
+          "asian": 0.0
+        }
+      },
+      "rig": "game_engine",
+      "skin": "young_caucasian_male",
+      "eyes": "low-poly",
+      "eyebrows": "eyebrow001",
+      "eyelashes": "eyelashes01",
+      "hair": "short02",
+      "clothes": [
+        "cortu_jeans_shorts"
+      ],
+      "materials": {
+        "cortu_jeans_shorts": {
+          "color": [
+            0.95,
+            0.95,
+            0.95,
+            1.0
+          ]
+        }
+      }
+    },
+    {
+      "name": "female_underwear",
+      "macro": {
+        "gender": 0.0,
+        "age": 0.5,
+        "muscle": 0.55,
+        "weight": 0.45,
+        "proportions": 0.42,
+        "height": 0.55,
+        "cupsize": 0.6,
+        "firmness": 0.7,
+        "race": {
+          "caucasian": 1.0,
+          "african": 0.0,
+          "asian": 0.0
+        }
+      },
+      "rig": "game_engine",
+      "skin": "young_caucasian_female",
+      "eyes": "low-poly",
+      "eyebrows": "eyebrow002",
+      "eyelashes": "eyelashes02",
+      "hair": "ponytail01",
+      "clothes": [
+        "wolgade_female_top_01",
+        "wolgade_female_panties_01"
+      ],
+      "materials": {
+        "wolgade_female_top_01": {
+          "color": [
+            0.95,
+            0.95,
+            0.95,
+            1.0
+          ]
+        },
+        "wolgade_female_panties_01": {
+          "color": [
+            0.95,
+            0.95,
+            0.95,
+            1.0
+          ]
+        }
+      }
+    },
+    {
+      "name": "male_dress",
+      "macro": {
+        "gender": 1.0,
+        "age": 0.5,
+        "muscle": 0.62,
+        "weight": 0.5,
+        "proportions": 0.72,
+        "height": 0.56,
+        "race": {
+          "caucasian": 1.0,
+          "african": 0.0,
+          "asian": 0.0
+        }
+      },
+      "rig": "game_engine",
+      "skin": "young_caucasian_male",
+      "eyes": "low-poly",
+      "eyebrows": "eyebrow001",
+      "eyelashes": "eyelashes01",
+      "hair": "short02",
+      "clothes": [
+        "toigo_shift_dress",
+        "shoes02"
+      ],
+      "materials": {
+        "toigo_shift_dress": {
+          "color": [
+            0.85,
+            0.25,
+            0.45,
+            1.0
+          ]
+        }
+      }
+    }
+  ]
+}

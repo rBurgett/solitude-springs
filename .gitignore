@@ -1,0 +1,25 @@
+# dependencies & builds
+node_modules/
+dist/
+.cache/
+
+# test / screenshot output
+smoke-out/
+shots-out/
+perf-out/
+lab/shots/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+
+# fetched or built assets (manifests and license files stay tracked)
+public/assets/fetched/
+public/assets/built/
+
+# python bytecode from the Blender scripts
+__pycache__/
+
+# agent handoff channel
+scratch/
