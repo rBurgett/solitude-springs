@@ -56,6 +56,7 @@ export class Npc {
   private animBudget = 0;
   private prev = new THREE.Vector3();
   private lastMoveSpeed = 0;
+  private stuckSeconds = 0;
   private tmp = new THREE.Vector3();
   private tmpQ = new THREE.Quaternion();
   private tmpQ2 = new THREE.Quaternion();
@@ -110,6 +111,11 @@ export class Npc {
 
   get isMoving(): boolean {
     return !this.arrived;
+  }
+
+  /** Seconds spent wanting to walk without getting anywhere (blocked by water or a prop). */
+  get stuckFor(): number {
+    return this.stuckSeconds;
   }
 
   /** Where the current route ends, while walking. */
@@ -242,6 +248,7 @@ export class Npc {
       this.position.y = this.world.groundAt(this.position.x, this.position.z, this.position.y + 2.5, this.collider ?? undefined);
     }
     this.lastMoveSpeed = Math.hypot(this.position.x - this.prev.x, this.position.z - this.prev.z) / Math.max(dt, 1e-4);
+    this.stuckSeconds = !this.arrived && this.lastMoveSpeed < 0.05 ? this.stuckSeconds + dt : 0;
     this.syncVisual();
     this.selectClip();
   }

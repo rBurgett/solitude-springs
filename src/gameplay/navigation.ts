@@ -149,9 +149,17 @@ export class NavGraph {
   }
 
   /** Waypoints (world positions) from a point to another, along the trails. */
+  /** The nearest trail node on the same bank as (x, z), so the straight legs at either end of a route never
+   *  cross the water (bridge nodes are over the river and don't count). Falls back to the nearest of all. */
+  nearestOnBank(x: number, z: number): NavNode {
+    const bank = this.side(x, z);
+    const same = this.nodes.filter((n) => n.kind !== 'bridge' && this.side(n.x, n.z) === bank);
+    return same.length ? this.nearestOf(same, x, z) : this.nearest(x, z);
+  }
+
   route(from: THREE.Vector3, to: THREE.Vector3): THREE.Vector3[] {
-    const a = this.nearest(from.x, from.z);
-    const b = this.nearest(to.x, to.z);
+    const a = this.nearestOnBank(from.x, from.z);
+    const b = this.nearestOnBank(to.x, to.z);
     const nodes = this.path(a.id, b.id);
     // skip the first node when it is behind us relative to the second
     const pts = nodes.map((n) => new THREE.Vector3(n.x, n.y, n.z));
@@ -169,11 +177,14 @@ export class NavGraph {
    * Prefers the same bank as `from` so the route doesn't detour over a bridge.
    */
   nodeAtDistance(from: THREE.Vector3, distance: number, rng: () => number, tolerance = 12): NavNode {
-    const near = this.nodes.filter((n) => Math.abs(Math.hypot(n.x - from.x, n.z - from.z) - distance) < tolerance && n.kind !== 'bridge');
     const bank = this.side(from.x, from.z);
-    const sameBank = near.filter((n) => this.side(n.x, n.z) === bank);
-    const ok = sameBank.length ? sameBank : near;
-    if (ok.length) return ok[Math.floor(rng() * ok.length)]!;
+    // prefer this bank even at a looser distance: a spawn across a wide stretch of water is a long way round
+    for (const tol of [tolerance, tolerance * 2, tolerance * 4]) {
+      const sameBank = this.nodes.filter((n) => n.kind !== 'bridge' && this.side(n.x, n.z) === bank && Math.abs(Math.hypot(n.x - from.x, n.z - from.z) - distance) < tol);
+      if (sameBank.length) return sameBank[Math.floor(rng() * sameBank.length)]!;
+    }
+    const near = this.nodes.filter((n) => Math.abs(Math.hypot(n.x - from.x, n.z - from.z) - distance) < tolerance && n.kind !== 'bridge');
+    if (near.length) return near[Math.floor(rng() * near.length)]!;
     // fall back to the closest match
     let best = this.nodes[0]!;
     let bd = Infinity;

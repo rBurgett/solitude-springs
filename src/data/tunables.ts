@@ -144,6 +144,11 @@ export const TUNABLES = {
   events: {
     visitLingerMinSeconds: 60,
     visitLingerMaxSeconds: 90,
+    /** A visitor still walking after this long (or making no progress for `visitStuckSeconds`) waves from where they are. */
+    visitApproachTimeoutSeconds: 60,
+    visitStuckSeconds: 8,
+    /** A leaver still around after this long is sent home directly. */
+    visitLeaveTimeoutSeconds: 90,
     visitGroupMax: 2,
     thiefRummageSeconds: 3,
     thiefGetawaySeconds: 40,

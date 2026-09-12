@@ -15,6 +15,8 @@ export class VisitRunner extends EventRunner {
   private linger = 0;
   private leaving = false;
   private reapproached = new Set<string>();
+  /** Seconds in the current phase. */
+  private timer = 0;
 
   constructor(h: EventHost, type: 'visit' | 'hiker', preferred?: string) {
     super(h, preferred);
@@ -60,10 +62,19 @@ export class VisitRunner extends EventRunner {
   step(dt: number): void {
     const h = this.h;
     if (this.done) return;
+    this.timer += dt;
     if (!this.leaving) {
-      // the visit clock only runs once somebody has arrived (a long route mustn't eat the visit)
+      // the visit clock only runs once somebody has arrived (a long route mustn't eat the visit) — but a
+      // visitor who can't get here (the far bank of the pool, a wall of trunks) waves from where they are
+      if (this.phase === 'approach') {
+        const stuck = this.visitors.filter((n) => n.isMoving && (n.stuckFor > E.visitStuckSeconds || this.timer > E.visitApproachTimeoutSeconds));
+        for (const n of stuck) n.arriveNow();
+      }
       if (this.phase === 'linger' && !h.isDialogueOpen()) this.linger -= dt;
-      else if (this.phase === 'approach' && this.visitors.every((n) => !n.isMoving)) this.phase = 'linger';
+      else if (this.phase === 'approach' && this.visitors.every((n) => !n.isMoving)) {
+        this.phase = 'linger';
+        this.timer = 0;
+      }
       // if the player wanders off, follow once
       for (const npc of this.visitors) {
         if (!npc.isMoving && npc.mode !== 'act' && !this.reapproached.has(npc.def.id) && npc.feet.distanceTo(h.player.feet) > 12) {
@@ -74,8 +85,10 @@ export class VisitRunner extends EventRunner {
       if (this.linger <= 0 && !h.isDialogueOpen()) {
         this.leaving = true;
         this.phase = 'leave';
-        const exit = h.npcs.exitPoint(h.player.feet, () => h.rng.next());
+        this.timer = 0;
         this.visitors.forEach((npc, i) => {
+          // leave along their own bank's trail, not the player's
+          const exit = h.npcs.exitPoint(npc.feet, () => h.rng.next());
           npc.lookAt(null);
           npc.face(null);
           npc.tag = 'busy';
@@ -87,6 +100,8 @@ export class VisitRunner extends EventRunner {
         });
       }
     } else {
+      // a leaver who is stuck, or still about after the timeout, goes home directly: the event must end
+      for (const n of this.visitors) if (h.npcs.get(n.def.id) && (n.stuckFor > E.visitStuckSeconds || this.timer > E.visitLeaveTimeoutSeconds)) h.npcs.despawn(n.def.id);
       const gone = this.visitors.every((n) => !h.npcs.get(n.def.id) || n.feet.distanceTo(h.player.feet) > TUNABLES.npc.despawnDistance);
       if (gone) this.finish();
     }
