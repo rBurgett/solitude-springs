@@ -187,6 +187,8 @@ export const TUNABLES = {
     fleeSpeed: 3.6,
     turnRate: 8,
     talkDistance: 2.3,
+    /** People never share a spot: the manager keeps characters at least this far apart (metres). */
+    minSeparation: 0.9,
     interactRange: 3,
     lookAtRange: 7,
     maxActive: 12,

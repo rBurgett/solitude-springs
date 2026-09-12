@@ -112,6 +112,35 @@ export class Npc {
     return !this.arrived;
   }
 
+  /** Where the current route ends, while walking. */
+  get destination(): THREE.Vector3 | null {
+    return !this.arrived && this.path.length ? this.path[this.path.length - 1]! : null;
+  }
+
+  /** Whether the separation pass may shove this character (not while rising from the water or mid-conversation). */
+  get canBeNudged(): boolean {
+    return this.mode !== 'float' && this.mode !== 'emerge' && this.mode !== 'talk';
+  }
+
+  /** Pushed sideways by another character (manager separation); the feet stay on the ground. */
+  nudge(dx: number, dz: number): void {
+    this.position.x += dx;
+    this.position.z += dz;
+    if (!this.waterLevelWalk) this.position.y = this.world.groundAt(this.position.x, this.position.z, this.position.y + 2.5, this.collider ?? undefined);
+    this.syncVisual();
+  }
+
+  /** Finish the route here (somebody already stands on the destination). */
+  arriveNow(): void {
+    if (this.arrived) return;
+    this.path = [];
+    this.arrived = true;
+    this.mode = 'idle';
+    const cb = this.onArrive;
+    this.onArrive = null;
+    cb?.();
+  }
+
   /** Turn toward a point (while standing). */
   face(target: THREE.Vector3 | null): void {
     this.faceTarget = target;

@@ -4,6 +4,7 @@ import * as THREE from 'three';
 import { Npc } from '../actors/npc.ts';
 import type { NpcDef } from '../data/npcs.ts';
 import { TUNABLES } from '../data/tunables.ts';
+import { resolveOverlaps } from '../sim/separation.ts';
 import type { World } from '../world/world.ts';
 import { NavGraph } from './navigation.ts';
 import { loadCharacterAssets } from '../character/character.ts';
@@ -74,6 +75,25 @@ export class NpcManager {
 
   step(dt: number): void {
     for (const n of this.active.values()) n.step(dt);
+    this.separate();
+  }
+
+  /** People never share a spot (plan §1 #43): resolve overlaps after the tick, and let a walker whose
+   *  destination somebody already occupies count as arrived instead of jostling forever. */
+  private separate(): void {
+    const list = [...this.active.values()];
+    if (list.length < 2) return;
+    const minSep = TUNABLES.npc.minSeparation;
+    const moves = resolveOverlaps(list.map((n) => ({ x: n.position.x, z: n.position.z, movable: n.canBeNudged })), minSep);
+    for (let i = 0; i < list.length; i++) {
+      const m = moves[i]!;
+      if (m.dx || m.dz) list[i]!.nudge(m.dx, m.dz);
+    }
+    for (const n of list) {
+      const dest = n.destination;
+      if (!dest || Math.hypot(dest.x - n.position.x, dest.z - n.position.z) > minSep + 0.35) continue;
+      if (list.some((o) => o !== n && Math.hypot(dest.x - o.position.x, dest.z - o.position.z) < minSep * 0.9)) n.arriveNow();
+    }
   }
 
   render(dt: number, cameraPos: THREE.Vector3): void {
@@ -106,9 +126,12 @@ export class NpcManager {
     const dir = new THREE.Vector3(from.x - player.x, 0, from.z - player.z);
     if (dir.lengthSq() < 1e-4) dir.set(0, 0, 1);
     dir.normalize();
+    // clamp to land first, then step sideways and clamp again: near the water both visitors used to
+    // snap to the same bank point and fuse into one body
+    const base = this.nav.landPoint(new THREE.Vector3(player.x, player.y, player.z).addScaledVector(dir, distance));
+    if (!sideOffset) return base;
     const side = new THREE.Vector3(-dir.z, 0, dir.x).multiplyScalar(sideOffset);
-    const target = new THREE.Vector3(player.x, player.y, player.z).addScaledVector(dir, distance).add(side);
-    return this.nav.landPoint(target);
+    return this.nav.landPoint(base.clone().add(side));
   }
 
   /** A trail-side spawn point roughly `distance` from the player. */

@@ -68,22 +68,23 @@ export class VisitRunner extends EventRunner {
       for (const npc of this.visitors) {
         if (!npc.isMoving && npc.mode !== 'act' && !this.reapproached.has(npc.def.id) && npc.feet.distanceTo(h.player.feet) > 12) {
           this.reapproached.add(npc.def.id);
-          this.approach(npc, 0);
+          this.approach(npc, this.visitors.indexOf(npc)); // each to their own spot, not both to the first one's
         }
       }
       if (this.linger <= 0 && !h.isDialogueOpen()) {
         this.leaving = true;
         this.phase = 'leave';
         const exit = h.npcs.exitPoint(h.player.feet, () => h.rng.next());
-        for (const npc of this.visitors) {
+        this.visitors.forEach((npc, i) => {
           npc.lookAt(null);
           npc.face(null);
           npc.tag = 'busy';
           const bye = h.eventLine(npc.def, 'wave');
           if (bye) h.bubble(npc, bye, 3);
-          npc.goTo(exit, TUNABLES.npc.walkSpeed);
+          // a slightly different pace each, so a pair strings out instead of walking off as one body
+          npc.goTo(exit, TUNABLES.npc.walkSpeed * (1 - 0.08 * i));
           npc.onArrive = () => h.npcs.despawn(npc.def.id);
-        }
+        });
       }
     } else {
       const gone = this.visitors.every((n) => !h.npcs.get(n.def.id) || n.feet.distanceTo(h.player.feet) > TUNABLES.npc.despawnDistance);
