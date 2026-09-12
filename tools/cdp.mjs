@@ -65,8 +65,11 @@ export async function launchChromium({ width = 1280, height = 720, gpu = false, 
   const glArgs = gpu
     ? ['--ignore-gpu-blocklist', '--enable-gpu-rasterization', '--enable-unsafe-webgpu']
     : ['--use-gl=angle', '--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist'];
+  // CHROMIUM_ARGS: extra flags, space-separated (tools/perf-nvidia.sh uses it to pick the GL path)
+  const extraArgs = process.env.CHROMIUM_ARGS ? process.env.CHROMIUM_ARGS.split(' ').filter(Boolean) : [];
   const args = [
     ...wrapperArgs,
+    ...extraArgs,
     ...(headless ? ['--headless=new'] : []),
     `--remote-debugging-port=${port}`,
     `--window-size=${width},${height}`,

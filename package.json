@@ -16,6 +16,7 @@
     "smoke": "node tools/smoke.mjs",
     "shots": "node tools/shots.mjs",
     "perf": "node tools/perf.mjs",
+    "perf:nvidia": "tools/perf-nvidia.sh",
     "simulate": "node tools/simulate.ts"
   },
   "engines": {
