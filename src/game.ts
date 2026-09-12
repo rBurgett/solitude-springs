@@ -26,7 +26,7 @@ import { tradeScreen } from './ui/screens/trade.ts';
 import { CharacterPreview } from './ui/preview.ts';
 import { renderPortrait } from './ui/portrait.ts';
 import { Input } from './input/input.ts';
-import type { BindingsStore } from './input/bindings.ts';
+import { keyLabel, type BindingsStore } from './input/bindings.ts';
 import type { SettingsStore } from './core/settings.ts';
 import { GameLoop } from './core/loop.ts';
 import { EventBus } from './core/events.ts';
@@ -44,7 +44,8 @@ import { SHARED_BARKS, DEFAULT_EVENT_LINES, type BarkCategory, type DialogueTree
 import { createClock, advanceClock, phaseOf, formatClock, setClockTime, cycleFraction, SECONDS_PER_GAME_HOUR, type ClockState } from './sim/clock.ts';
 import { createZoneState, recoverZone, onCatch as zoneOnCatch, onCanPickedUp, isTrashed, type ZoneState } from './sim/zones.ts';
 import { createInventory, addItem, takeSlot, selectedStack, selectSlot, outfitOf, removeItem, equipFromSlot, removeAllFish, hasItem, countItem, type InventoryState, type ItemStack } from './sim/inventory.ts';
-import { createJournal, createStats, recordCatch, recordPerson, type JournalState, type StatsState } from './sim/journal.ts';
+import { MESSAGES } from './data/messages.ts';
+import { createJournal, createStats, pickMessage, recordMessage, recordCatch, recordPerson, type JournalState, type StatsState } from './sim/journal.ts';
 import { checkAchievements } from './sim/achievements.ts';
 import { rollFish, rollJunk, rollClothing, rollWeight, biteWindowFor, type CatchContext, type CatchResult } from './sim/catchTable.ts';
 import type { FishingEvent } from './sim/fishing.ts';
@@ -565,6 +566,17 @@ export class Game {
       surface = s[2]! > 0.5 ? 'gravel' : s[0]! > 0.5 ? 'grass' : 'dirt';
     }
     this.host.audio.footstep(surface, p.speed > 3.5 ? 0.16 : 0.11);
+  }
+
+  /** A fished-up bottle's note goes straight into the Journal (plan §8.3); once all twelve are found the river repeats itself. */
+  private readBottle(): void {
+    const id = pickMessage(this.journal, MESSAGES.map((m) => m.id), () => this.rng.next());
+    if (!id) {
+      this.hud.toast('Another bottle, and you have read this note before. The river repeats itself.');
+      return;
+    }
+    recordMessage(this.journal, id);
+    this.hud.toast(`A note inside (${this.journal.messages.length} of ${MESSAGES.length}). Read it in the Journal (${keyLabel(this.host.bindings.get().journal.primary)}).`, 'catch');
   }
 
   // ---- inventory / items -------------------------------------------------------------------
@@ -1193,6 +1205,7 @@ export class Game {
       fits = this.give(c.itemId, 1, c.color);
       this.hud.toast(`You fished up: ${def.name}`, 'catch');
       if (!fits) this.hud.toast('Your pockets are full. It lands at your feet.', 'warn');
+      if (c.itemId === 'message_bottle') this.readBottle();
       this.host.audio?.catchSplash();
     }
     this.bus.emit('catch', { result: c, zoneId: zoneId ?? '', newSpecies, newRecord, droppedAtFeet: !fits });
@@ -1588,6 +1601,7 @@ export class Game {
         director: { enabled: this.directorEnabled, sessionSeconds: this.director.sessionSeconds, nextIn: this.director.nextEventAt - this.director.sessionSeconds, grace: this.director.graceUntil - this.director.sessionSeconds, lull: this.director.lull, wanted: this.director.wanted, ufoRecentUntil: this.director.ufoRecentUntil, eventsRun: this.director.eventsRun },
         memories: Object.fromEntries(Object.entries(this.memories).map(([k, m]) => [k, { met: m.met, relationship: m.relationship, grudge: m.grudge, stolen: m.stolen.length, poofed: m.poofed }])),
         people: [...this.journal.people],
+        messages: [...this.journal.messages],
         fps: this.loop.stats(), draws: this.host.gl.renderer.info.render.calls, tris: this.host.gl.renderer.info.render.triangles,
       }),
       key: (action: string, down: boolean) => this.input.inject(action as never, down),

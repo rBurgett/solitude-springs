@@ -6,6 +6,7 @@ import type { JournalState, StatsState } from '../../sim/journal.ts';
 import { formatWeight } from '../../sim/save/format.ts';
 import { ACHIEVEMENTS } from '../../data/achievements.ts';
 import { NPC_BY_ID } from '../../data/npcs.ts';
+import { MESSAGES, MESSAGE_BY_ID } from '../../data/messages.ts';
 import type { NpcMemory } from '../../sim/npcMemory.ts';
 
 export interface JournalActions {
@@ -32,7 +33,12 @@ export function journalScreen(a: JournalActions): HTMLElement {
       return el('div', { class: 'fish-card' }, [el('div', { class: 'n' }, `🐟 ${f.name}`), el('div', { class: 's' }, `${rec.caught} caught · record ${formatWeight(rec.recordLb)}`), el('div', { class: 's' }, f.description)]);
     })),
   ]);
-  pages.messages = el('div', { class: 'tab-page' }, [a.journal.messages.length ? el('ul', {}, a.journal.messages.map((m) => el('li', {}, m))) : el('p', { class: 'hint' }, 'No messages in bottles yet. The river writes slowly.')]);
+  pages.messages = el('div', { class: 'tab-page' }, [
+    el('p', { class: 'hint' }, `${a.journal.messages.length} of ${MESSAGES.length} notes found · fish up a Message in a Bottle to read one`),
+    a.journal.messages.length
+      ? el('div', { class: 'journal-fish' }, a.journal.messages.map((id, i) => el('div', { class: 'fish-card' }, [el('div', { class: 'n' }, `📜 Bottle ${i + 1}`), el('div', { class: 's' }, MESSAGE_BY_ID.get(id)?.text ?? id)])))
+      : el('p', { class: 'hint' }, 'No messages in bottles yet. The river writes slowly.'),
+  ]);
   const relLabel = (r: number): string => (r >= 40 ? 'friend' : r >= 15 ? 'warm' : r <= -30 ? 'grudge' : r < 0 ? 'cool' : 'acquaintance');
   pages.people = el('div', { class: 'tab-page' }, [
     el('p', { class: 'hint' }, `${a.journal.people.length} of ${NPC_BY_ID.size} regulars met`),

@@ -61,7 +61,7 @@ npm run perf         # frame times per graphics preset on the real GPU (--preset
   `tools/fetch-assets.mjs`. Downloads are HTTPS-only from allow-listed hosts and verified against the
   SHA-256 recorded in the manifest.
 - Characters are generated headlessly with Blender 5.2 + MPFB 2.0.17
-  (`assets-src/characters/blender/generate.py` from `players.json`) from CC0 MakeHuman packs into
+  (`assets-src/characters/blender/generate.py` from `players.json`) from MakeHuman packs (CC0, plus the CC-BY swimwear pack credited in `ASSETS.md`) into
   `public/assets/built/characters/mpfb/`.
 - Animations: the CC0 Quaternius Universal Animation Library clips are retargeted onto the MPFB rig
   by `assets-src/characters/blender/retarget.py` (`animations.json`), together with hand-authored

@@ -106,6 +106,20 @@
       "size": 60561755
     },
     {
+      "id": "mpfb-pack-underwear03",
+      "kind": "file",
+      "title": "MakeHuman underwear03 (swimwear, CC-BY)",
+      "url": "https://files.makehumancommunity.org/asset_packs/underwear03/underwear03_cc-by.zip",
+      "dest": ".cache/downloads/underwear03_cc-by.zip",
+      "extractTo": ".cache/mpfb/data",
+      "author": "Mindfront (mindfront_f_one-piece_swimsuit_01); pack by the MakeHuman community",
+      "license": "CC-BY 4.0",
+      "source": "https://static.makehumancommunity.org/assets/assetpacks/underwear03.html",
+      "usage": "The one-piece swimsuit worn by Marina Costa and Sierra Blake and fished up as the Swimsuit item (asset mindfront_f_one-piece_swimsuit_01 by Mindfront, CC-BY). Only that asset is used from the pack.",
+      "sha256": "2dfe0594808d0d296649c613d764bb1192c3a59f6c78f6f58ace32aa966c59f6",
+      "size": 39976527
+    },
+    {
       "id": "mpfb-pack-skins01",
       "kind": "file",
       "title": "MakeHuman skins01 (female)",

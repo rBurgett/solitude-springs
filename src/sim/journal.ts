@@ -67,6 +67,20 @@ export function createStats(): StatsState {
   };
 }
 
+/** Fishing up a bottle: one note not yet found, or null once every note has been read. */
+export function pickMessage(j: JournalState, ids: readonly string[], random: () => number): string | null {
+  const left = ids.filter((id) => !j.messages.includes(id));
+  if (!left.length) return null;
+  return left[Math.min(left.length - 1, Math.floor(random() * left.length))]!;
+}
+
+/** Record a found note; false when it was already in the Journal. */
+export function recordMessage(j: JournalState, id: string): boolean {
+  if (j.messages.includes(id)) return false;
+  j.messages.push(id);
+  return true;
+}
+
 export interface CatchRecordResult {
   newSpecies: boolean;
   newRecord: boolean;

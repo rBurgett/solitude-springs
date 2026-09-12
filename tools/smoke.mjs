@@ -238,6 +238,26 @@ try {
   s = await waitState((x) => x.fishing === 'idle', 'junk reel', 8000);
   expect(s.stats.junkCaught === 1, 'a junk item was caught');
   await shot('caught-junk');
+  // --- a Message in a Bottle reads its note into the Journal (owner note, plan §1 #41) ---
+  s = await castAndWait(yawToward(s.pos[0], s.pos[2], s.pos[0], s.pos[2] + 25));
+  await run('catch message_bottle');
+  await run('bite');
+  await waitState((x) => x.fishing === 'bite', 'bottle bite', 5000);
+  await key('use', true);
+  await sleep(120);
+  await key('use', false);
+  s = await waitState((x) => x.fishing === 'idle' && x.messages.length === 1, 'the bottle to be read into the journal', 10_000);
+  expect(s.inventory.some((i) => i.startsWith('message_bottle')), 'the bottle itself is kept');
+  await ev(`window.__ss.openOverlay('journal')`);
+  await sleep(300);
+  await browser.click('[data-tab=messages]');
+  await sleep(300);
+  const noteShown = await ev(`!!document.querySelector('.tab-page .fish-card .s')?.textContent`);
+  expect(noteShown, 'the journal shows the note text');
+  await shot('journal-message');
+  await ev('window.__ss.closeOverlay()');
+  await sleep(300);
+  console.log('  message in a bottle read into the journal:', s.messages[0]);
 
   // --- fish up a dress and put it on ---
   s = await castAndWait(yawToward(s.pos[0], s.pos[2], s.pos[0], s.pos[2] + 25));

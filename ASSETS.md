@@ -15,6 +15,7 @@ HTTPS-only from an allow-listed host and verified against the SHA-256 recorded h
 | mpfb-pack-shoes01 | MakeHuman shoes01 | MakeHuman community | CC0 | [link](https://static.makehumancommunity.org/assets/assetpacks/shoes01.html) | `.cache/downloads/shoes01_cc0.zip` | `ded3f70428505eab` |
 | mpfb-pack-dress01 | MakeHuman dress01 | MakeHuman community | CC0 | [link](https://static.makehumancommunity.org/assets/assetpacks/dress01.html) | `.cache/downloads/dress01_cc0.zip` | `f49ba54a3c93acd3` |
 | mpfb-pack-underwear01 | MakeHuman underwear01 | MakeHuman community | CC0 | [link](https://static.makehumancommunity.org/assets/assetpacks/underwear01.html) | `.cache/downloads/underwear01_cc0.zip` | `8c3b51cf18d26ea0` |
+| mpfb-pack-underwear03 | MakeHuman underwear03 (swimwear, CC-BY) | Mindfront (mindfront_f_one-piece_swimsuit_01); pack by the MakeHuman community | CC-BY 4.0 | [link](https://static.makehumancommunity.org/assets/assetpacks/underwear03.html) | `.cache/downloads/underwear03_cc-by.zip` | `2dfe0594808d0d29` |
 | mpfb-pack-skins01 | MakeHuman skins01 (female) | MakeHuman community | CC0 | [link](https://static.makehumancommunity.org/assets/assetpacks/skins01.html) | `.cache/downloads/skins01_cc0.zip` | `7495ab99287053bd` |
 | mpfb-pack-skins02 | MakeHuman skins02 (male) | MakeHuman community | CC0 | [link](https://static.makehumancommunity.org/assets/assetpacks/skins02.html) | `.cache/downloads/skins02_cc0.zip` | `1613f1ef3afca530` |
 | mpfb-pack-hair01 | MakeHuman hair01 | MakeHuman community | CC0 | [link](https://static.makehumancommunity.org/assets/assetpacks/hair01.html) | `.cache/downloads/hair01_cc0.zip` | `49445d69848a313e` |
@@ -45,6 +46,7 @@ Usage notes:
 - **mpfb-pack-shoes01** — Sneakers, flats, boots.
 - **mpfb-pack-dress01** — Dresses.
 - **mpfb-pack-underwear01** — Underwear base layer.
+- **mpfb-pack-underwear03** — The one-piece swimsuit worn by Marina Costa and Sierra Blake and fished up as the Swimsuit item (asset mindfront_f_one-piece_swimsuit_01 by Mindfront, CC-BY). Only that asset is used from the pack.
 - **mpfb-pack-skins01** — Skin materials.
 - **mpfb-pack-skins02** — Skin materials.
 - **mpfb-pack-hair01** — Hairstyles.
