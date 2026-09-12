@@ -127,7 +127,6 @@ export class Game {
   private lastFootstepAt = 0;
   private music: Music | null = null;
   private ambience: Ambience | null = null;
-  private ambienceMuted = false;
   private statsOverlay: HTMLElement | null = null;
   private tmp = new THREE.Vector3();
   private disposed = false;
@@ -357,6 +356,8 @@ export class Game {
     if (slot >= 0) this.selectSlot(slot);
     const wheel = inp.takeWheel();
     if (wheel) this.selectSlot(this.inventory.selected + wheel);
+    if (inp.pressed('slotNext')) this.selectSlot(this.inventory.selected + 1);
+    if (inp.pressed('slotPrev')) this.selectSlot(this.inventory.selected - 1);
     if (inp.pressed('camera')) this.camera.cycleDistance();
     if (inp.pressed('drop')) this.dropSelected();
     if (inp.pressed('interact')) this.interact();
@@ -503,7 +504,7 @@ export class Game {
       const f = cycleFraction(this.clock);
       const C = TUNABLES.clock;
       const nightW = f > (C.dawnSeconds + C.daySeconds + C.duskSeconds) / C.dayLengthSeconds ? 1 : f < C.dawnSeconds / C.dayLengthSeconds ? 0.5 : 0;
-      this.ambience.update(Math.max(0, this.world.valley.edgeDistance(this.player.feet.x, this.player.feet.z)), this.ambienceMuted ? 2 : nightW, this.ambienceMuted ? 0 : this.world.valley.forestAt(this.player.feet.x, this.player.feet.z));
+      this.ambience.update(nightW);
     }
     // HUD
     const near = this.pickups.nearest(this.player.feet);
@@ -912,9 +913,7 @@ export class Game {
       bubble: (n, t, s) => g.hud.bubble(n.def.id, t, s),
       unlockChecks: () => g.unlockChecks(),
       save: (r) => g.save(r),
-      setAmbienceMuted: (m) => {
-        g.ambienceMuted = m;
-      },
+      setAmbienceMuted: (m) => g.ambience?.setMuted(m),
       setLightFlicker: (a) => {
         g.world.lightFlicker = a;
       },
@@ -1416,6 +1415,7 @@ export class Game {
         self.director.wanted = Math.max(0, Number(n) || 0);
         return `wanted ${self.director.wanted}`;
       },
+      input: () => JSON.stringify(self.input.diagnostics()),
       tp: ([where, z]) => {
         let x: number;
         let zz: number;

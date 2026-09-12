@@ -31,7 +31,7 @@ npm run dev          # Vite dev server → http://localhost:5173/  (the game is 
 
 Controls (rebindable in **Controls**): W A S D move, mouse look, Space jump, Shift sprint,
 **right mouse** hold to charge a cast / release to cast / press to reel, F interact, E inventory,
-Q drop, 1–9 or wheel hotbar, V camera distance, J journal, Esc pause. In the inventory: click an
+Q drop, 1–9, wheel or [ ] hotbar, V camera distance, J journal, Esc pause. In the inventory: click an
 item, then click where it goes (or drag), shift-click splits, double-click equips or uses. In a
 conversation: click or Space continues, 1–4 pick a choice, Esc leaves. Dev builds open the debug console with `` ` ``
 (`help` lists commands: `event <type> [npc]`, `npc <id>`, `talk <id>`, `endevent`, `lull`,

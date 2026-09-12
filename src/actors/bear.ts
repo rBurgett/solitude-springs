@@ -7,6 +7,11 @@ import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import type { World } from '../world/world.ts';
 import { modelUrl } from '../render/assets.ts';
 
+/** Placeholder gait: metres of ground per stride cycle, and each leg's phase (LF, RF, LH, RH) in the
+ *  lateral-sequence walk bears use (LH → LF → RH → RF, a quarter cycle apart). */
+const STRIDE_METRES = 1.2;
+const LEG_PHASE = [Math.PI / 2, (3 * Math.PI) / 2, 0, Math.PI] as const;
+
 export class Bear {
   readonly root = new THREE.Group();
   readonly position = new THREE.Vector3();
@@ -16,7 +21,9 @@ export class Bear {
   private speed = 2.2;
   private legs: THREE.Object3D[] = [];
   private head: THREE.Object3D | null = null;
+  private torso: THREE.Group | null = null;
   private phase = 0;
+  private clockSeconds = 0;
   private mixer: THREE.AnimationMixer | null = null;
   private clips = new Map<string, THREE.AnimationClip>();
   private current: THREE.AnimationAction | null = null;
@@ -87,15 +94,19 @@ export class Bear {
   private buildPlaceholder(): void {
     const fur = new THREE.MeshStandardMaterial({ color: 0x241a12, roughness: 0.95 });
     const snoutMat = new THREE.MeshStandardMaterial({ color: 0x5a4030, roughness: 0.9 });
+    // the torso (body, hump, head) bobs and rolls with the stride; the legs hang from fixed hips
+    const torso = new THREE.Group();
+    this.root.add(torso);
+    this.torso = torso;
     const body = new THREE.Mesh(new THREE.SphereGeometry(0.55, 14, 10), fur);
     body.scale.set(1.0, 0.85, 1.6);
     body.position.set(0, 0.85, 0);
     body.castShadow = true;
-    this.root.add(body);
+    torso.add(body);
     const hump = new THREE.Mesh(new THREE.SphereGeometry(0.4, 12, 8), fur);
     hump.position.set(0, 1.1, 0.35);
     hump.castShadow = true;
-    this.root.add(hump);
+    torso.add(hump);
     const head = new THREE.Group();
     const skull = new THREE.Mesh(new THREE.SphereGeometry(0.3, 12, 10), fur);
     skull.castShadow = true;
@@ -116,14 +127,18 @@ export class Bear {
       head.add(eye);
     }
     head.position.set(0, 1.0, 0.95);
-    this.root.add(head);
+    torso.add(head);
     this.head = head;
+    // each leg pivots at its hip, so a swing reads as a step rather than a scissor about the knee
     for (const [sx, sz] of [[-0.3, 0.55], [0.3, 0.55], [-0.3, -0.5], [0.3, -0.5]] as const) {
-      const leg = new THREE.Mesh(new THREE.CylinderGeometry(0.13, 0.16, 0.7, 8), fur);
-      leg.position.set(sx, 0.35, sz);
+      const hip = new THREE.Group();
+      hip.position.set(sx, 0.72, sz);
+      const leg = new THREE.Mesh(new THREE.CylinderGeometry(0.13, 0.16, 0.72, 8), fur);
+      leg.position.y = -0.36;
       leg.castShadow = true;
-      this.root.add(leg);
-      this.legs.push(leg);
+      hip.add(leg);
+      this.root.add(hip);
+      this.legs.push(hip);
     }
   }
 
@@ -198,7 +213,7 @@ export class Bear {
         const stepLen = Math.min(d, this.speed * dt);
         this.position.x += Math.sin(this.yaw) * stepLen;
         this.position.z += Math.cos(this.yaw) * stepLen;
-        this.phase += dt * this.speed * 2.6;
+        this.phase += dt * (this.speed / STRIDE_METRES) * Math.PI * 2;
       }
     }
     this.position.y = this.world.groundAt(this.position.x, this.position.z, this.position.y + 3);
@@ -209,13 +224,21 @@ export class Bear {
   render(dt: number): void {
     if (this.mixer) this.mixer.update(dt);
     else {
-      // procedural gait + sniffing head bob
-      this.legs.forEach((l, i) => {
-        l.rotation.x = this.target ? Math.sin(this.phase + (i % 2 ? Math.PI : 0) + (i < 2 ? 0 : Math.PI / 2)) * 0.45 : 0;
+      // placeholder gait: hip-pivoted legs in a lateral-sequence walk, a torso bob on each footfall
+      // pair with a slight roll, and the sniffing head bob; everything eases out when it stops
+      this.clockSeconds += dt;
+      const walking = !!this.target;
+      this.legs.forEach((hip, i) => {
+        hip.rotation.x = walking ? Math.sin(this.phase + LEG_PHASE[i]!) * 0.55 : THREE.MathUtils.damp(hip.rotation.x, 0, 8, dt);
       });
+      if (this.torso) {
+        this.torso.position.y = THREE.MathUtils.damp(this.torso.position.y, walking ? Math.abs(Math.sin(this.phase)) * 0.05 : 0, 14, dt);
+        this.torso.rotation.z = THREE.MathUtils.damp(this.torso.rotation.z, walking ? Math.sin(this.phase) * 0.05 : 0, 14, dt);
+      }
       if (this.head) {
-        this.head.position.y = this.sniffing > 0 ? 0.75 + Math.sin(performance.now() / 120) * 0.05 : 1.0;
-        this.head.rotation.x = this.sniffing > 0 ? 0.35 : 0;
+        const sniff = this.sniffing > 0;
+        this.head.position.y = sniff ? 0.75 + Math.sin(this.clockSeconds * 8) * 0.05 : 1.0 + (walking ? Math.sin(this.phase * 2) * 0.02 : 0);
+        this.head.rotation.x = THREE.MathUtils.damp(this.head.rotation.x, sniff ? 0.35 : 0, 10, dt);
       }
     }
   }

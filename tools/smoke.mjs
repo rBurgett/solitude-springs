@@ -111,6 +111,15 @@ try {
   }
 
   // --- new game → creator ---
+  // count audio sources that start and are never scheduled to stop, and looping buffer sources:
+  // the owner hears any continuous layer (held pads, noise loops) as an engine whine (plan §1 #38)
+  await ev(`(() => {
+    const live = new Set(); window.__audioLive = live; window.__audioLoops = 0;
+    const wrap = (proto, name) => { const orig = proto[name]; proto[name] = function (...a) { const node = orig.apply(this, a); live.add(node);
+      const stop = node.stop.bind(node); node.stop = (...s) => { live.delete(node); return stop(...s); }; return node; }; };
+    wrap(BaseAudioContext.prototype, 'createOscillator'); wrap(BaseAudioContext.prototype, 'createBufferSource');
+    const start = AudioBufferSourceNode.prototype.start; AudioBufferSourceNode.prototype.start = function (...a) { if (this.loop) window.__audioLoops++; return start.apply(this, a); };
+    return true; })()`);
   await browser.click('[data-action=new]');
   await browser.waitFor('!!document.querySelector("[data-action=begin]")', 20_000);
   await sleep(2500);
@@ -138,10 +147,36 @@ try {
   expect(s.stats.metresWalked >= 0, 'stats present');
   await shot('river-bank');
 
+  // no continuous audio layer after the walk down (plan §1 #38)
+  {
+    const live = await ev('window.__audioLive.size');
+    const loops = await ev('window.__audioLoops');
+    expect(live === 0 && loops === 0, `no sustained audio sources (never-stopped: ${live}, loops: ${loops})`);
+    console.log('  audio: no sustained sources, no loops');
+  }
+
   // --- cast from the bank (aim west across the river), force a bite, catch a fish ---
   await run('give beer_can 3');
   s = await state();
   expect(s.selected === 0 && s.inventory.some((i) => i.startsWith('old_rod')), 'rod in slot 1');
+  // the mouse wheel scrolls the hotbar even without pointer lock (owner note: it sometimes stopped
+  // working — the browser had refused to re-lock after an Escape exit until the next click)
+  const wheel = (deltaY) => browser.send('Input.dispatchMouseEvent', { type: 'mouseWheel', x: 640, y: 360, deltaX: 0, deltaY });
+  await wheel(120);
+  s = await waitState((x) => x.selected === 1, 'the wheel to select slot 2', 5_000);
+  await wheel(-120);
+  s = await waitState((x) => x.selected === 0, 'the wheel to return to slot 1', 5_000);
+  console.log('  wheel scrolls the hotbar without pointer lock');
+  // [ and ] cycle the hotbar too (keyboard fallback), and the input diagnostics command answers
+  await key('slotNext', true);
+  await key('slotNext', false);
+  s = await waitState((x) => x.selected === 1, '] to select slot 2', 5_000);
+  await key('slotPrev', true);
+  await key('slotPrev', false);
+  s = await waitState((x) => x.selected === 0, '[ to return to slot 1', 5_000);
+  const diag = JSON.parse(await run('input'));
+  expect(typeof diag.wheelEvents === 'number' && diag.wheelEvents >= 2, `input diagnostics count wheel events (${diag.wheelEvents})`);
+  console.log('  [ ] cycle the hotbar; input diagnostics:', JSON.stringify(diag));
   s = await castAndWait(yawToward(s.pos[0], s.pos[2], s.pos[0] - 20, s.pos[2]));
   expect(s.fishing === 'waiting', 'line waiting on the water (bank cast)');
   console.log('  cast from the bank into zone', s.zone);

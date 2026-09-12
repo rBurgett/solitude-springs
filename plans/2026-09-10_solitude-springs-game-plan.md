@@ -20,7 +20,7 @@ This plan was written from a design conversation with the owner. Everything deci
 
 - Everything from M1 plus the M2 build list (§20): the 58-name roster with looks, voices, trading and dialogue (all 58 have full trees; the tone review is §22 #7), NPC framework (character factory on the two player bodies, trail-graph navigation + steering, look-at), the dialogue box with typewriter and gibberish voices, trading with live moods, NPC memory, the Annoyance Director (serenity, grace periods, pacing ramp, lulls, eligibility, cooldowns) with `npm run simulate`, the events — camper/hiker visits, water-walkers (Marina included), thieves (loot, strip, pity barrel, getaway, loot kept in memory), parties (music, dancing, brown grass, cans, beer water, population 0, recovery, cleanup), the bear, the alligator, UFO abductions (same-spot return, outfit replacement, missing time, glowing perch), grudge returns — health/damage/death, and the tutorial narrator cut off by the scripted thief.
 - **Play it:** `npm run dev` → the game is the root page. Events arrive on their own after the 4-minute grace; every one can be forced from the console (`event <type> [npcId]`, `npc <id>`, `talk <id>`).
-- **Evidence for the checkpoint** (all run 2026-09-11): `npm run typecheck`, `npm test` (64 pass), `npm run deps:check` (all ≥ 16 d), `npm run build`, `npm run simulate` (passes: see §20 M2 status), `npm run smoke -- --gpu` plays the M1 path and then forces every M2 event with zero console errors (34 screenshots in `smoke-out/`: visit + dialogue + trade, the pause toggle, the strip and the pity barrel, the party with 22 cans → zero bites → save/load mid-trash → collecting every can clears the water, the bear taking only the fish, Marina rising, the gator bite, Wade's grudge demand, the abduction returning within 0.1 m in a new outfit). `npm run perf -- --preset=medium` on the Intel Iris Xe at 1080p: the six M1 stations at 60 fps (p95 ≤ 17.5 ms); the new `party` station (six NPCs, music, props) at 47 fps / p95 22.9 ms, 214 draw calls, 1.4 M triangles — the M2 worst case and over budget (§17); NPC levels of detail and shared materials are the M4 fix.
+- **Evidence for the checkpoint** (all run 2026-09-11, and re-run in full after the round 2–3 commits at `0b9d2d7`): `npm run typecheck`, `npm test` (66 pass), `npm run deps:check` (all ≥ 16 d), `npm run build`, `npm run simulate` (passes: see §20 M2 status), `npm run smoke -- --gpu` plays the M1 path and then forces every M2 event with zero console errors (34 screenshots in `smoke-out/`: visit + dialogue + trade, the pause toggle, the strip and the pity barrel, the party with 22 cans → zero bites → save/load mid-trash → collecting every can clears the water, the bear taking only the fish, Marina rising, the gator bite, Wade's grudge demand, the abduction returning within 0.1 m in a new outfit). `npm run perf -- --preset=medium` on the Intel Iris Xe at 1080p: the six M1 stations at 60 fps (p95 ≤ 17.5 ms); the new `party` station (six NPCs, music, props) at 47 fps / p95 22.9 ms, 214 draw calls, 1.4 M triangles — the M2 worst case and over budget (§17); NPC levels of detail and shared materials are the M4 fix.
 - **Not met yet / carried:** the ranger event, weapons, the boat and the M3 confrontation rules are stubs (`onThreatened` hooks exist on every runner); the bear is an in-house placeholder until the owner downloads the Sketchfab model (README "Asset pipeline"); the bundle still copies all of `public/` (222 MB); the Medium/Iris Xe budget holds at the M1 stations but a party (six NPCs) drops to 47 fps (§17).
 - The M0/M1 lab pages still work (`lab/index.html`).
 - `prompt.md` was dropped from the repository (owner decision, §1 #22).
@@ -30,7 +30,7 @@ This plan was written from a design conversation with the owner. Everything deci
 | Tool | Version / how to run | Notes |
 |---|---|---|
 | Node | v24.14.0 | Strips TypeScript types natively, so `node --test` works with no extra packages. |
-| npm | 11.9.0 | Must be upgraded to ≥ 11.10 for `min-release-age` (§3.3). Owner approval needed. |
+| npm | 11.19.1 | Upgraded 2026-09-10 (§1 #23); `min-release-age=14` active (§3.3). |
 | Chromium | flatpak `org.chromium.Chromium` 152.0.7977.64 → `flatpak run org.chromium.Chromium` | For DevTools Protocol smoke tests and screenshots. |
 | Blender | flatpak `org.blender.Blender` 5.2.0 LTS → `flatpak run org.blender.Blender` | Headless usage and sandbox caveats in §4.5. |
 | GPUs | Intel Iris Xe (Raptor Lake-P) + NVIDIA RTX 4050 Max-Q (hybrid laptop) | Performance targets in §17. |
@@ -39,7 +39,7 @@ This plan was written from a design conversation with the owner. Everything deci
 **First steps**
 
 1. Read §0–§4 and §20 (M1 status) in full. Skim the rest; read each section fully when its milestone starts.
-2. The M1 checkpoint passed on 2026-09-11 (§1 #31). **The M2 checkpoint is in progress:** the owner's first round of M2 notes (§1 #32–35) is fixed and re-verified; do not start M3 until the owner is satisfied. Record further feedback in §1 / §22 first (the pacing targets, §22 #5, and the dialogue tone, §22 #7, are the open asks).
+2. The M1 checkpoint passed on 2026-09-11 (§1 #31). **The M2 checkpoint is in progress:** four rounds of the owner's M2 notes (§1 #32–40) are fixed and re-verified; rounds 1–3 are committed at `0b9d2d7`, round 4 (no continuous audio layer, a readable bear gait, the wheel without pointer lock) awaits the owner's commit request. Do not start M3 until the owner is satisfied. Open asks: dialogue tone and the alien interview (the owner has not been abducted yet). Record further feedback in §1 / §22 first (the pacing targets, §22 #5, and the dialogue tone, §22 #7, are the open asks).
 3. Re-verify licenses before using any asset. Appendix A (§23) has the 2026-09-10 research with source links, but licenses and free tiers change.
 
 **Working rules**
@@ -79,6 +79,10 @@ This plan was written from a design conversation with the owner. Everything deci
 - 2026-09-11 — M2 committed (`eac6f9c`). Held items in the hand (§1 #36).
 - 2026-09-11 — First M2 play notes (§1 #32–35): inventory moves fixed (+ click-to-move), Actual Solitude gated on the three-minute calm window, NPC outfits mapped through the item catalog (no accidental underwear), character capsules in their own collision group (no more airborne partiers). Dialogue, robbery, parties and achievements reported as working.
 - 2026-09-11 — M2 built (§0.1 current state, §20 M2 status). Recorded the NPC/dialogue/trading/Director implementation notes (§10, §11), the pacing tunables chosen from `npm run simulate` (§11.2), the save schema bump to 2 (§14.2), new console commands (§18.3), the M2 checkpoint asks (§22). No new dependencies.
+- 2026-09-11 — M2 play-note rounds 2–3 recorded (§1 #34 round 2, #36; the wheel-under-pointer-lock change and its open question in §22 M2 asks (f)–(g)); test count corrected to 66; the full smoke re-run after the round 2–3 commits (`0b9d2d7`).
+- 2026-09-11 — M2 play notes round 4 (§1 #37–40): pacing accepted; every continuous audio layer removed (the score's pads were three octaves too high and, with the river/wind loops, sounded like an engine — §15 updated, §22 #4 and #5 resolved); the placeholder bear's gait rebuilt so it visibly walks; the wheel scrolls the hotbar without pointer lock (cause found; the smoke now covers it).
+- 2026-09-11 — M2 play notes round 5 (§1 #40): the wheel failure is Chromium-on-Wayland pointer-lock position drift, not Escape; added a lock resync, [ / ] hotbar keys (§6), the `input` console command (§18.3), unit tests. Music accepted as better.
+- 2026-09-11 — Round 6: the lock resync made everything worse (constant "press Esc" banner, pause menu on refused re-locks, walking jitter) and is removed; [ ] keys and `input` stay (§1 #40). Rule recorded: the page locks the pointer once and never re-locks on its own.
 
 ---
 
@@ -119,9 +123,13 @@ This plan was written from a design conversation with the owner. Everything deci
 | 31 | M1 checkpoint (2026-09-11) | Passed: after rounds 1–2 (#29–30) plus solid bridge rails the owner said "Looking good" and told the implementer to continue. M2 started. The §22 asks (d) synthesized vs recorded ambience and (e) art-direction notes were not explicitly answered; they stay open and the defaults stand (synthesis only; no art changes). |
 | 32 | Nobody naked (M2 feedback, 2026-09-11) | The game is for the owner's kids: **no character may ever appear completely naked.** The underwear base layer stays as specified (#26), but an NPC must never spawn in it by accident (Deep Dive Doug did: his wetsuit item had no mesh mapping, so he rose from the river in boxers). Fixed by mapping roster outfits through the item catalog; a data test now proves every NPC outfit resolves to a garment mesh on its body and covers top and bottom. |
 | 33 | Actual Solitude too easy (M2 feedback) | The owner hit 100% serenity in the first minutes (the opening grace period). The achievement now requires **holding 100% for the full three-minute calm window** (the same gate as Old Gus), so the scripted thief at the end of the grace always interrupts it. |
-| 34 | Inventory moves (M2 feedback) | Items could not be moved between the hotbar and the backpack: the drag attribute was written as an empty string, which browsers ignore. Fixed, and **click-to-move** was added (click an item, click its destination or a worn slot) so the screen works without drag-and-drop. Round 2: a hovered tooltip survived closing the screen with Esc or E; it now lives inside the screen element. |
-| 36 | Held items (M2 feedback, 2026-09-11) | Only the rod ever appeared in the hand. The selected hotbar item now shows in the right hand as its placeholder mesh (`src/gameplay/itemMesh.ts`, shared with world pickups; `src/gameplay/heldItem.ts`); proper weapon poses arrive with M3's aiming. |
+| 34 | Inventory moves (M2 feedback) | Items could not be moved between the hotbar and the backpack: the drag attribute was written as an empty string, which browsers ignore. Fixed, and **click-to-move** was added (click an item, click its destination or a worn slot) so the screen works without drag-and-drop. Round 2: a hovered tooltip survived closing the screen with Esc or E (it now lives inside the screen element), and the owner reported the mouse wheel not scrolling the hotbar with the camera behind the player — not reproducible headless (real pointer lock exists only headed); wheel events are now taken at the window level in the capture phase while the pointer is locked, and the question stays open (§22 M2 asks (f)). |
 | 35 | Partiers flying (M2 feedback) | NPCs walking in a group shot into the air and vanished: each one's ground probe could hit a neighbour's capsule. Character capsules now live in their own collision group that ground probes, the camera ray and the bobber ignore (the player still bumps into people). |
+| 36 | Held items (M2 feedback, 2026-09-11) | Only the rod ever appeared in the hand. The selected hotbar item now shows in the right hand as its placeholder mesh (`src/gameplay/itemMesh.ts`, shared with world pickups; `src/gameplay/heldItem.ts`); proper weapon poses arrive with M3's aiming. |
+| 37 | Pacing (M2 feedback round 4, 2026-09-11) | "Pacing is fine for now." The §11.2 tunables stand; §22 #5 resolved. |
+| 38 | Background sound (round 4) | "The background noise is AWFUL. It sounds like some sort of whiny engine, constantly going. I'd prefer for it to not be there." Cause: the score held four pad oscillators for the whole session, pitched three octaves too high by a semitone-offset bug (1–2 kHz), on top of the looped river and wind noise. **Every continuous layer is gone:** no pads, no river or wind bed. What remains is the sparse plucked score (now C4–B5) and short wildlife calls — birds by day; frogs, a quieter and rarer cricket, and an owl at night. If the river should be heard again it comes back as real recordings on request, never synthesis (§22 #4). |
+| 39 | Bear animation (round 4) | "The bear looks fine for now, but it isn't animated. It just glides along, unmoving." The placeholder's gait was too small to read: legs pivoting about their middles, stride rate unrelated to speed, no body motion. Rebuilt: hip-pivoted legs in a lateral-sequence walk, stride rate tied to speed, torso bob and roll, head bob, everything easing out at a stop. The Sketchfab model with real clips is still the plan whenever the owner downloads it (README "Asset pipeline"). |
+| 40 | Mouse wheel (rounds 4–6) | Round 4: "mostly works now, but sometimes doesn't"; round 5: it works with the camera in front of the character and stops with the camera behind, no Escape or E involved. **Cause (2026-09-11):** the owner plays in Brave as a native Wayland client on COSMIC. Chromium on Wayland never re-centres the pointer while it is locked (every other platform warps it back near the window border), so the browser's idea of where the hidden pointer is drifts with every mouse movement — turning the camera *is* that drift — and wheel events, hit-tested at that position, are dropped before the page sees them once it has left the window. The round-4 "Escape exit" explanation was wrong (that gate stays removed; harmless). **Tried and reverted (round 6):** a page-side resync that released and re-took the lock whenever the estimate left the window. Chromium shows the "To show your cursor, press Esc" banner on *every* lock acquisition, so it was on screen constantly; a refused re-lock opened the pause menu ("it still loses focus"); and the lock churn plus a timer armed on every mouse event produced a walking jitter ("double vision"). Rule: **lock the pointer once per play session, never re-lock on the page's own initiative.** What ships: **[ and ] cycle the hotbar** (rebindable `slotPrev`/`slotNext`) and the console command `input` (captured/locked state, viewport, wheel-event count, lock-change count). Owner-side check that would confirm the cause and restore the wheel: Brave → `brave://flags/#ozone-platform-hint` → X11 (XWayland re-centres the pointer under lock). Not reproducible here (no Wayland input injection). |
 
 ---
 
@@ -392,7 +400,7 @@ Every binding is rebindable in **Controls** (keys and mouse buttons), with confl
 | Interact | F | Talk, trade, pick up, board/leave boat, collect cans. |
 | Inventory | E | Opens the inventory and equipment screen (the world keeps running). |
 | Drop selected item | Q | |
-| Hotbar slot | 1–9, mouse wheel | Wheel cycles slots, as in Minecraft. |
+| Hotbar slot | 1–9, mouse wheel, [ / ] | Wheel cycles slots, as in Minecraft; [ and ] also cycle (rebindable; added 2026-09-11 as a keyboard fallback, §1 #40). |
 | Camera distance | V | Cycles near / mid / far. |
 | Journal | J | Fish log, people met, achievements. |
 | Map | M | Painted park map with "you are here". |
@@ -1160,16 +1168,15 @@ Every human NPC is in one of three states:
 
 **Music (generative, synthesized in Web Audio)**
 
-- **Calm score:** soft plucked guitar/piano phrases, warm pads and gentle chord changes that shift between day and night.
+- **Calm score:** sparse plucked phrases over gentle chord changes that shift between day and night. **No sustained pads** — held oscillators read as an engine whine (§1 #38).
 - **Interruptions:** the score **ducks with a record-scratch** when a major event begins, then fades back in once calm.
 - **Party music:** a loud, bass-heavy synthesized dance loop, positional (muffled and distant as you walk away).
 - **Motifs:** UFO (theremin-like warble), alligator (original ominous low motif, not an imitation of any film theme), bear (low brass stab).
 
 **Ambience**
 
-- River flow positioned along the river spline; spring bubbling at the pool.
-- Wind in the trees.
-- Birdsong by day; frogs, crickets and an owl at night.
+- Birdsong by day; frogs, crickets and an owl at night — short calls only.
+- **No continuous bed** (river, wind): the synthesized loops read as an engine whine (§1 #38). If the river is to be heard it will be a CC0 recording, added only on the owner's request (§22 #4).
 
 **Effects**
 
@@ -1336,6 +1343,7 @@ Commands:
 - `give <itemId> [n]`, `outfit <itemIds…>`
 - `serenity <n>`, `wanted <n>`
 - `tp <area>`
+- `input` — pointer-lock diagnostics: captured/locked state, viewport, wheel events seen, lock changes (§1 #40)
 - `trash <zone> <0..1>`
 - `npc <id>`
 - `heal`, `kill`
@@ -1432,7 +1440,7 @@ Acceptance not fully met: **60 fps Medium on Iris Xe** — four of six stations 
 
 ### M2 — The interruptions
 
-**Status (2026-09-11): built; checkpoint in progress** — the owner's first play notes (§1 #32–35) are fixed and re-verified (typecheck, 66 tests, smoke). Evidence: `typecheck`, `test` (64 pass: sim suites for the Director, dialogue runner, trading, theft/abduction/health/memory, data integrity, save v2), `deps:check` (all ≥ 16 d), `build`, `simulate` (passes the three targets, §11.2), `npm run smoke -- --gpu` plays the M1 path and then forces every M2 event with zero console errors (34 screenshots in `smoke-out/`: visit + dialogue + trade, the pause toggle, the strip and the pity barrel, the party with 22 cans → zero bites → save/load mid-trash → collecting every can clears the water, the bear taking only the fish, Marina rising, the gator bite, Wade's grudge demand, the abduction returning within 0.1 m in a new outfit). `npm run perf -- --preset=medium` on the Intel Iris Xe at 1080p: the six M1 stations at 60 fps (p95 ≤ 17.5 ms); the new `party` station (six NPCs, music, props) at 47 fps / p95 22.9 ms, 214 draw calls, 1.4 M triangles — the M2 worst case and over budget (§17); NPC levels of detail and shared materials are the M4 fix. Every acceptance check below is exercised by the smoke test except *Buzzkill*, which needs a drawn weapon (M3). Known gaps carried: the ranger event and every `onThreatened` hook are M3 stubs; the bear is a placeholder until the owner downloads the Sketchfab model; no ambient passersby alongside an active event; NPCs keep their roster outfits (no wardrobe changes, as planned); the bundle copies all of `public/`; the Medium/Iris Xe budget holds at the six M1 stations and misses at the party station (§17).
+**Status (2026-09-11): built; checkpoint in progress** — the owner's play notes, four rounds so far (§1 #32–40), are fixed and re-verified (typecheck, 66 tests, smoke); rounds 1–3 are committed at `0b9d2d7`, round 4 (no continuous audio layer, a readable bear gait, the wheel without pointer lock) awaits commit. Evidence: `typecheck`, `test` (66 pass: sim suites for the Director, dialogue runner, trading, theft/abduction/health/memory, data integrity, save v2), `deps:check` (all ≥ 16 d), `build`, `simulate` (passes the three targets, §11.2), `npm run smoke -- --gpu` plays the M1 path and then forces every M2 event with zero console errors (34 screenshots in `smoke-out/`: visit + dialogue + trade, the pause toggle, the strip and the pity barrel, the party with 22 cans → zero bites → save/load mid-trash → collecting every can clears the water, the bear taking only the fish, Marina rising, the gator bite, Wade's grudge demand, the abduction returning within 0.1 m in a new outfit). `npm run perf -- --preset=medium` on the Intel Iris Xe at 1080p: the six M1 stations at 60 fps (p95 ≤ 17.5 ms); the new `party` station (six NPCs, music, props) at 47 fps / p95 22.9 ms, 214 draw calls, 1.4 M triangles — the M2 worst case and over budget (§17); NPC levels of detail and shared materials are the M4 fix. Every acceptance check below is exercised by the smoke test except *Buzzkill*, which needs a drawn weapon (M3). Known gaps carried: the ranger event and every `onThreatened` hook are M3 stubs; the bear is a placeholder until the owner downloads the Sketchfab model; no ambient passersby alongside an active event; NPCs keep their roster outfits (no wardrobe changes, as planned); the bundle copies all of `public/`; the Medium/Iris Xe budget holds at the six M1 stations and misses at the party station (§17).
 
 **Build**
 
@@ -1508,16 +1516,18 @@ Resolve at the noted checkpoint, then move each into §1.
 1. ~~Character family~~ — resolved 2026-09-11: A (§1 #25).
 2. ~~Setting~~ — resolved 2026-09-11: Southeastern springs (§1 #27).
 3. ~~Alligator model~~ — default kept: in-house (§1 #28); the owner can still swap in a sourced model later.
-4. **Recorded CC0 ambience** vs. synthesis-only. *M1 shipped synthesis only (river noise, wind, birds, frogs/crickets/owl, plucked score). Owner to judge at the M1 checkpoint.*
-5. **Pacing targets** after the first real play-test (events/hour, fish/hour). *M2 shipped the tunables listed in §11.2 "M2 implementation"; owner to judge at the M2 checkpoint.*
-6. **Alien interior vignette** — keep, shorten, or cut. *M2 shipped a three-question interview (skippable after the first abduction); owner to judge.*
+4. ~~Recorded CC0 ambience vs. synthesis-only~~ — resolved 2026-09-11: the owner heard the synthesized bed as a constant engine whine and wants it gone (§1 #38). No continuous layer ships; a CC0 river/wind recording is added later only if the owner asks for it.
+5. ~~Pacing targets~~ — resolved 2026-09-11: "pacing is fine for now" (§1 #37); the §11.2 tunables stand.
+6. **Alien interior vignette** — keep, shorten, or cut. *M2 shipped a three-question interview (skippable after the first abduction). The owner had not been abducted yet as of 2026-09-11, so this stays open.*
 7. **Dialogue tone review** — any roster seeds to cut, change or add. *All 58 trees exist (`src/data/dialogue/`); owner to review at the M2 checkpoint.*
 
 **M0 checkpoint outcome (2026-09-11):** the owner picked A (MPFB2) and confirmed the setting; see §1 #25–28 for the feedback that shapes M1.
 
 **M1 checkpoint outcome (2026-09-11):** passed (§1 #31). Answered in play: (a) animation reads as real motion (no further notes after the sprint lean fix); (b) layout accepted; (c) underwear layer accepted. Still open: (d) recorded ambience (item 4 above) and (e) art-direction notes — the owner can raise either at the M2 checkpoint.
 
-**M2 checkpoint asks (2026-09-11):** (a) pacing — do the interruptions feel relentless-but-fair? (`src/data/tunables.ts` → `director`, `events`, `serenity`; `npm run simulate` reports the effect); (b) dialogue tone — any roster seeds or lines to cut, change or add (§10.6); (c) the alien interior vignette (§22 #6): keep, shorten or cut; (d) recorded ambience (§22 #4) still open; (e) the bear: download the Sketchfab model (README "Asset pipeline") or keep the placeholder until M4.
+**M2 checkpoint asks (2026-09-11):** (a) pacing — do the interruptions feel relentless-but-fair? (`src/data/tunables.ts` → `director`, `events`, `serenity`; `npm run simulate` reports the effect); (b) dialogue tone — any roster seeds or lines to cut, change or add (§10.6); (c) the alien interior vignette (§22 #6): keep, shorten or cut; (d) recorded ambience (§22 #4) still open; (e) the bear: download the Sketchfab model (README "Asset pipeline") or keep the placeholder until M4; (f) the mouse wheel: does it still fail to scroll the hotbar with the camera behind the player, and if so, do keys 1–9 still work at that moment and does Esc + a click fix it? (if yes, it is the browser's hidden-cursor routing under pointer lock and a fallback key binding is the answer); (g) stripped men keep boxers only, per §1 #26 — if they should keep an undershirt it is a one-line `players.json` change and a 25 s regenerate.
+
+**M2 checkpoint, round 4 (2026-09-11):** (a) pacing is fine (§1 #37); (c) not seen yet — no abduction so far; (d) the synthesized bed is gone (§1 #38); (e) the placeholder bear stays but had to move (§1 #39); (f) the wheel was intermittent — the Escape diagnosis was wrong; round 5 pinned it to Brave on Wayland and the pointer-lock drift; the resync attempted in round 5 was reverted in round 6; [ ] keys and the `input` diagnostic ship, and the owner can confirm the cause by switching Brave to X11 (§1 #40). Still open: (b) dialogue tone, (c) the alien interview, (g) the undershirt.
 
 **M1 checkpoint asks (2026-09-11, kept for the record):** (a) does the walk/jog/cast/reel animation now read as real motion on the MPFB bodies? (b) is the valley layout right (trailhead ridge → pool → three bridges → campground → beach → dock → marsh)? (c) underwear layer as specified? (d) synthesized audio acceptable or add CC0 recordings? (e) any art-direction notes before M2 fills the world with people.
 

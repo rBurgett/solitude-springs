@@ -4,7 +4,7 @@ import { readLocal, writeLocal } from '../core/storage.ts';
 
 export type Action =
   | 'forward' | 'back' | 'left' | 'right' | 'jump' | 'sprint' | 'use' | 'attack' | 'interact' | 'inventory' | 'drop'
-  | 'slot1' | 'slot2' | 'slot3' | 'slot4' | 'slot5' | 'slot6' | 'slot7' | 'slot8' | 'slot9'
+  | 'slot1' | 'slot2' | 'slot3' | 'slot4' | 'slot5' | 'slot6' | 'slot7' | 'slot8' | 'slot9' | 'slotPrev' | 'slotNext'
   | 'camera' | 'journal' | 'map' | 'console';
 
 export interface Binding {
@@ -17,11 +17,11 @@ export type Bindings = Record<Action, Binding>;
 export const ACTION_LABELS: Record<Action, string> = {
   forward: 'Move forward', back: 'Move back', left: 'Move left', right: 'Move right', jump: 'Jump', sprint: 'Sprint',
   use: 'Use item (cast / reel / aim)', attack: 'Attack', interact: 'Interact', inventory: 'Inventory', drop: 'Drop selected item',
-  slot1: 'Hotbar 1', slot2: 'Hotbar 2', slot3: 'Hotbar 3', slot4: 'Hotbar 4', slot5: 'Hotbar 5', slot6: 'Hotbar 6', slot7: 'Hotbar 7', slot8: 'Hotbar 8', slot9: 'Hotbar 9',
+  slot1: 'Hotbar 1', slot2: 'Hotbar 2', slot3: 'Hotbar 3', slot4: 'Hotbar 4', slot5: 'Hotbar 5', slot6: 'Hotbar 6', slot7: 'Hotbar 7', slot8: 'Hotbar 8', slot9: 'Hotbar 9', slotPrev: 'Previous hotbar slot', slotNext: 'Next hotbar slot',
   camera: 'Camera distance', journal: 'Journal', map: 'Map', console: 'Developer console',
 };
 
-export const ACTION_ORDER: readonly Action[] = ['forward', 'back', 'left', 'right', 'jump', 'sprint', 'use', 'attack', 'interact', 'inventory', 'drop', 'slot1', 'slot2', 'slot3', 'slot4', 'slot5', 'slot6', 'slot7', 'slot8', 'slot9', 'camera', 'journal', 'map', 'console'];
+export const ACTION_ORDER: readonly Action[] = ['forward', 'back', 'left', 'right', 'jump', 'sprint', 'use', 'attack', 'interact', 'inventory', 'drop', 'slot1', 'slot2', 'slot3', 'slot4', 'slot5', 'slot6', 'slot7', 'slot8', 'slot9', 'slotPrev', 'slotNext', 'camera', 'journal', 'map', 'console'];
 
 export function defaultBindings(): Bindings {
   return {
@@ -45,6 +45,8 @@ export function defaultBindings(): Bindings {
     slot7: { primary: 'Digit7', secondary: null },
     slot8: { primary: 'Digit8', secondary: null },
     slot9: { primary: 'Digit9', secondary: null },
+    slotPrev: { primary: 'BracketLeft', secondary: null },
+    slotNext: { primary: 'BracketRight', secondary: null },
     camera: { primary: 'KeyV', secondary: null },
     journal: { primary: 'KeyJ', secondary: null },
     map: { primary: 'KeyM', secondary: null },

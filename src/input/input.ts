@@ -22,8 +22,11 @@ export class Input {
   private opts: InputOptions;
   private captured = false;
   private wantCapture = false;
-  /** When true, game actions are ignored (a text field or menu has focus). */
-  suspended = false;
+  private _suspended = false;
+  // diagnostics for the `input` console command (plan §1 #40)
+  private wheelEvents = 0;
+  private lastWheelClient: { x: number; y: number } | null = null;
+  private lockChanges = 0;
 
   constructor(target: HTMLElement, bindings: BindingsStore, opts: InputOptions = {}) {
     this.target = target;
@@ -52,6 +55,21 @@ export class Input {
     window.removeEventListener('mousemove', this.onMouseMove);
     window.removeEventListener('wheel', this.onWheel, { capture: true });
     document.removeEventListener('pointerlockchange', this.onLockChange);
+  }
+
+  /** When true, game actions are ignored (a text field or menu has focus). Suspending drops any
+   *  wheel steps or mouse motion already queued so they don't fire on resume. */
+  get suspended(): boolean {
+    return this._suspended;
+  }
+
+  set suspended(v: boolean) {
+    this._suspended = v;
+    if (v) {
+      this.wheel = 0;
+      this.mouseDx = 0;
+      this.mouseDy = 0;
+    }
   }
 
   private isEditable(e: Event): boolean {
@@ -111,7 +129,12 @@ export class Input {
   };
 
   private onWheel = (e: WheelEvent): void => {
-    if (!this.captured || this.suspended) return;
+    this.wheelEvents++;
+    this.lastWheelClient = { x: e.clientX, y: e.clientY };
+    // not gated on pointer lock: the hotbar keeps scrolling whenever the game is playing unlocked
+    // (the click-to-play state). Note the Brave/Wayland wheel loss is not fixable here: under lock
+    // the browser drops the events before the page sees them (plan §1 #40).
+    if (this.suspended) return;
     e.preventDefault();
     e.stopPropagation();
     this.wheel += Math.sign(e.deltaY || e.deltaX);
@@ -121,6 +144,7 @@ export class Input {
     const now = document.pointerLockElement === this.target;
     const lost = this.captured && !now;
     this.captured = now;
+    this.lockChanges++;
     if (lost) {
       this.wantCapture = false;
       this.onBlur();
@@ -149,6 +173,11 @@ export class Input {
 
   get isCaptured(): boolean {
     return this.captured;
+  }
+
+  /** For the `input` console command. */
+  diagnostics(): Record<string, unknown> {
+    return { captured: this.captured, suspended: this._suspended, pointerLocked: document.pointerLockElement === this.target, viewport: { width: window.innerWidth, height: window.innerHeight }, wheelEvents: this.wheelEvents, lastWheelClient: this.lastWheelClient, lockChanges: this.lockChanges };
   }
 
   private codesFor(action: Action): (string | null)[] {
