@@ -962,6 +962,9 @@ export class Game {
       } catch {
         portrait = null;
       }
+      // someone still walking up counts as arrived where they stand: nobody strolls off mid-conversation,
+      // and arriving during it would reset the mode to idle (losing the talking clip)
+      if (npc.isMoving) npc.arriveNow();
       npc.face(this.player.feet);
       npc.lookAt(this.player.feet);
       if (npc.mode !== 'act') npc.mode = 'talk';

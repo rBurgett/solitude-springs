@@ -144,11 +144,13 @@ export const TUNABLES = {
   events: {
     visitLingerMinSeconds: 60,
     visitLingerMaxSeconds: 90,
-    /** A visitor still walking after this long (or making no progress for `visitStuckSeconds`) waves from where they are. */
+    /** A visitor still walking after this long waves from where they are. */
     visitApproachTimeoutSeconds: 60,
-    visitStuckSeconds: 8,
-    /** A leaver still around after this long is sent home directly. */
-    visitLeaveTimeoutSeconds: 90,
+    /** Any event NPC making no progress for this long (water, a wall of trunks, a crowd) gives up on that leg:
+     *  a visitor waves from where they are, a partier dances on the spot, a leaver goes home directly. */
+    stuckSeconds: 8,
+    /** A leaver (any event) still around after this long goes home directly, so every event ends. */
+    leaveTimeoutSeconds: 120,
     visitGroupMax: 2,
     thiefRummageSeconds: 3,
     thiefGetawaySeconds: 40,

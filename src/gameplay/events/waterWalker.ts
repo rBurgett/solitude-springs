@@ -14,6 +14,8 @@ export class WaterWalkerRunner extends EventRunner {
   private rise = 0;
   private linger = 0;
   private leaving = false;
+  /** Seconds in the leave phase. */
+  private timer = 0;
   private bank = new THREE.Vector3();
 
   constructor(h: EventHost, preferred?: string) {
@@ -79,17 +81,23 @@ export class WaterWalkerRunner extends EventRunner {
       return;
     }
     if (this.phase === 'linger' && !this.leaving) {
+      // blocked on the way up to the player (trunks, a wading player's bank): say the bit from here
+      if (npc.isMoving && npc.stuckFor > E.stuckSeconds) npc.arriveNow();
       if (!h.isDialogueOpen()) this.linger -= dt;
       if (this.linger <= 0 && !h.isDialogueOpen()) {
         this.leaving = true;
         this.phase = 'leave';
+        this.timer = 0;
         npc.tag = 'busy';
         npc.lookAt(null);
         npc.face(null);
-        npc.goTo(h.npcs.exitPoint(h.player.feet, () => h.rng.next()), TUNABLES.npc.walkSpeed);
+        npc.goTo(h.npcs.exitPoint(npc.feet, () => h.rng.next()), TUNABLES.npc.walkSpeed);
         npc.onArrive = () => h.npcs.despawn(npc.def.id);
       }
     } else if (this.leaving) {
+      this.timer += dt;
+      // a leaver who is stuck, or still about after the timeout, goes home directly: the event must end
+      if (h.npcs.get(npc.def.id) && (npc.stuckFor > E.stuckSeconds || this.timer > E.leaveTimeoutSeconds)) h.npcs.despawn(npc.def.id);
       if (!h.npcs.get(npc.def.id) || npc.feet.distanceTo(h.player.feet) > TUNABLES.npc.despawnDistance) this.finish();
     }
   }

@@ -44,7 +44,8 @@ export class ThiefRunner extends EventRunner {
       // behind the player, off the trail is fine
       const back = new THREE.Vector3(-Math.sin(h.player.yaw), 0, -Math.cos(h.player.yaw));
       spawn = new THREE.Vector3(p.x, p.y, p.z).addScaledVector(back, 20);
-      if (h.world.valley.edgeDistance(spawn.x, spawn.z) < 2) spawn = h.npcs.spawnPoint(p, 22, () => h.rng.next());
+      // in the water, or across it (the player facing away from a narrow stretch): sneak up along the trail instead
+      if (h.world.valley.edgeDistance(spawn.x, spawn.z) < 2 || h.npcs.nav.side(spawn.x, spawn.z) !== h.npcs.nav.side(p.x, p.z)) spawn = h.npcs.spawnPoint(p, 22, () => h.rng.next());
       spawn.y = h.world.groundAt(spawn.x, spawn.z);
     } else spawn = h.npcs.spawnPoint(p, 30, () => h.rng.next());
     const npc = await h.npcs.spawn(def, spawn, 0);
@@ -200,7 +201,8 @@ export class ThiefRunner extends EventRunner {
     this.fleeTimer = 0;
     const line = h.eventLine(npc.def, 'flee');
     if (line && fast) h.bubble(npc, line, 3);
-    const exit = h.npcs.exitPoint(h.player.feet, () => h.rng.next());
+    // along their own bank's trail (a thief who gave up the chase may be nowhere near the player)
+    const exit = h.npcs.exitPoint(npc.feet, () => h.rng.next());
     npc.goTo(exit, fast ? N.fleeSpeed : N.walkSpeed, { direct: false });
     npc.onArrive = () => h.npcs.despawn(npc.def.id);
   }

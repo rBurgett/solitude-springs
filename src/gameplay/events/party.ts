@@ -144,6 +144,10 @@ export class PartyRunner extends EventRunner {
   step(dt: number): void {
     const h = this.h;
     if (this.done) return;
+    if (this.phase === 'arrive' || this.phase === 'party') {
+      // a partier who can't reach their spot (water, trunks, a crowd) dances where they stand
+      for (const n of this.group) if (n.isMoving && n.stuckFor > E.stuckSeconds) n.arriveNow();
+    }
     if (this.phase === 'party') {
       this.timer += dt;
       this.whoopTimer -= dt;
@@ -157,6 +161,9 @@ export class PartyRunner extends EventRunner {
       if (this.flamingo) this.flamingo.position.y = 0.02 + Math.sin(this.timer * 1.6) * 0.05;
       if (this.timer >= E.partySeconds) this.endParty();
     } else if (this.phase === 'leave') {
+      this.timer += dt;
+      // a leaver who is stuck, or still about after the timeout, goes home directly: the event must end
+      for (const n of this.group) if (h.npcs.get(n.def.id) && (n.stuckFor > E.stuckSeconds || this.timer > E.leaveTimeoutSeconds)) h.npcs.despawn(n.def.id);
       const gone = this.group.every((n) => !h.npcs.get(n.def.id) || n.feet.distanceTo(this.center) > 60);
       if (gone) this.finish();
     } else if (this.phase === 'arrive') {
@@ -172,6 +179,7 @@ export class PartyRunner extends EventRunner {
   private endParty(): void {
     const h = this.h;
     this.phase = 'leave';
+    this.timer = 0;
     this.music?.stop();
     this.music = null;
     // aftermath: brown grass + beer water + cans + population 0 (§11.4)
@@ -201,13 +209,14 @@ export class PartyRunner extends EventRunner {
     h.bus.emit('partyEnded', { zoneId: this.zoneId ?? '', cans: placed, brokeUp: this.brokeUp });
     // the partiers leave (the speaker and cooler go with the first two)
     const exit = h.npcs.exitPoint(this.center, () => h.rng.next());
-    for (const npc of this.group) {
+    this.group.forEach((npc, i) => {
       npc.act(null);
       npc.face(null);
       npc.tag = 'busy';
-      npc.goTo(exit, this.brokeUp ? TUNABLES.npc.fleeSpeed : TUNABLES.npc.walkSpeed);
+      // a slightly different pace each, so the group strings out along the trail instead of leaving as one clump
+      npc.goTo(exit, this.brokeUp ? TUNABLES.npc.fleeSpeed : TUNABLES.npc.walkSpeed * (1 - 0.04 * i));
       npc.onArrive = () => h.npcs.despawn(npc.def.id);
-    }
+    });
     for (const name of ['speaker', 'cooler']) this.props.getObjectByName(name)?.removeFromParent();
     this.flamingo?.removeFromParent();
     this.flamingo = null;

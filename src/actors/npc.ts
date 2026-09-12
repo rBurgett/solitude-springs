@@ -100,6 +100,8 @@ export class Npc {
     this.speed = speed;
     this.allowWater = !!opts.water;
     this.arrived = false;
+    // a new route is a new attempt: someone who gave up a blocked approach gets a fair go at leaving
+    this.stuckSeconds = 0;
     this.mode = speed >= N.fleeSpeed - 0.01 ? 'flee' : speed > N.walkSpeed + 0.3 ? 'jog' : 'walk';
   }
 

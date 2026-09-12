@@ -65,10 +65,10 @@ export class VisitRunner extends EventRunner {
     this.timer += dt;
     if (!this.leaving) {
       // the visit clock only runs once somebody has arrived (a long route mustn't eat the visit) — but a
-      // visitor who can't get here (the far bank of the pool, a wall of trunks) waves from where they are
-      if (this.phase === 'approach') {
-        const stuck = this.visitors.filter((n) => n.isMoving && (n.stuckFor > E.visitStuckSeconds || this.timer > E.visitApproachTimeoutSeconds));
-        for (const n of stuck) n.arriveNow();
+      // visitor who can't get here (the far bank of the pool, a wall of trunks) waves from where they are,
+      // whether on the first approach, still walking after the first one arrived, or following the player
+      for (const n of this.visitors) {
+        if (n.isMoving && (n.stuckFor > E.stuckSeconds || (this.phase === 'approach' && this.timer > E.visitApproachTimeoutSeconds))) n.arriveNow();
       }
       if (this.phase === 'linger' && !h.isDialogueOpen()) this.linger -= dt;
       else if (this.phase === 'approach' && this.visitors.every((n) => !n.isMoving)) {
@@ -101,7 +101,7 @@ export class VisitRunner extends EventRunner {
       }
     } else {
       // a leaver who is stuck, or still about after the timeout, goes home directly: the event must end
-      for (const n of this.visitors) if (h.npcs.get(n.def.id) && (n.stuckFor > E.visitStuckSeconds || this.timer > E.visitLeaveTimeoutSeconds)) h.npcs.despawn(n.def.id);
+      for (const n of this.visitors) if (h.npcs.get(n.def.id) && (n.stuckFor > E.stuckSeconds || this.timer > E.leaveTimeoutSeconds)) h.npcs.despawn(n.def.id);
       const gone = this.visitors.every((n) => !h.npcs.get(n.def.id) || n.feet.distanceTo(h.player.feet) > TUNABLES.npc.despawnDistance);
       if (gone) this.finish();
     }

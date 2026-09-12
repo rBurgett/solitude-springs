@@ -10,6 +10,8 @@ import type { DialogueTree } from '../../data/dialogue.ts';
 import { itemDef } from '../../data/items.ts';
 import { ThiefRunner } from './thief.ts';
 
+const E = TUNABLES.events;
+
 export class GrudgeRunner extends EventRunner {
   readonly type = 'grudge' as const;
   private npc: Npc | null = null;
@@ -100,9 +102,11 @@ export class GrudgeRunner extends EventRunner {
     const npc = this.npc!;
     this.leaving = true;
     this.phase = 'leave';
+    this.timer = 0;
     npc.lookAt(null);
     npc.face(null);
-    npc.goTo(h.npcs.exitPoint(h.player.feet, () => h.rng.next()), TUNABLES.npc.jogSpeed);
+    // along their own bank's trail (after the approach timeout they may not be anywhere near the player)
+    npc.goTo(h.npcs.exitPoint(npc.feet, () => h.rng.next()), TUNABLES.npc.jogSpeed);
     npc.onArrive = () => h.npcs.despawn(npc.def.id);
   }
 
@@ -119,8 +123,14 @@ export class GrudgeRunner extends EventRunner {
       return;
     }
     this.timer += dt;
-    if (this.leaving && this.npc && (!h.npcs.get(this.npc.def.id) || this.npc.feet.distanceTo(h.player.feet) > TUNABLES.npc.despawnDistance)) this.finish();
-    if (this.phase === 'approach' && this.timer > 60) this.leave();
+    const npc = this.npc;
+    if (this.leaving && npc) {
+      // a leaver who is stuck, or still about after the timeout, goes home directly: the event must end
+      if (h.npcs.get(npc.def.id) && (npc.stuckFor > E.stuckSeconds || this.timer > E.leaveTimeoutSeconds)) h.npcs.despawn(npc.def.id);
+      if (!h.npcs.get(npc.def.id) || npc.feet.distanceTo(h.player.feet) > TUNABLES.npc.despawnDistance) this.finish();
+    }
+    // can't reach the player (or blocked for good): the grudge keeps, they storm off
+    if (this.phase === 'approach' && npc && (this.timer > 60 || npc.stuckFor > E.stuckSeconds)) this.leave();
   }
 
   ringState(): ReturnType<ThiefRunner['ringState']> {
