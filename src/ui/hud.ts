@@ -21,6 +21,13 @@ export interface HudState {
   captured: boolean;
   biteIndicator: boolean;
   saving: boolean;
+  /** M3: aiming a weapon (crosshair grows, the target's name shows) and the rounds left for it. */
+  aiming: boolean;
+  aim: { name: string; kind: 'innocent' | 'threatening' | 'hostile' | 'animal'; progress: number } | null;
+  ammo: number | null;
+  reloading: boolean;
+  /** In the boat: the HUD says so next to the hearts. */
+  boat: boolean;
 }
 
 export class Hud {
@@ -45,6 +52,10 @@ export class Hud {
   private ring: HTMLElement;
   private ringFill: HTMLElement;
   private narrator: HTMLElement;
+  private target: HTMLElement;
+  private targetName: HTMLElement;
+  private targetRing: HTMLElement;
+  private ammo: HTMLElement;
   private areaTimer = 0;
   private lastArea = '';
   private bubbleEls = new Map<string, { el: HTMLElement; until: number }>();
@@ -75,7 +86,13 @@ export class Hud {
     this.ringFill = el('div', { class: 'hud-ring-fill' });
     this.ring = el('div', { class: 'hud-ring', hidden: true }, [this.ringFill]);
     this.narrator = el('div', { class: 'hud-narrator', hidden: true });
+    this.targetName = el('div', { class: 'hud-target-name' });
+    this.targetRing = el('div', { class: 'hud-target-ring' });
+    this.target = el('div', { class: 'hud-target', hidden: true }, [this.targetRing, this.targetName]);
+    this.ammo = el('div', { class: 'hud-ammo', hidden: true });
     this.root = el('div', { class: 'hud' }, [
+      this.target,
+      this.ammo,
       this.bubbles,
       this.ring,
       this.narrator,
@@ -133,6 +150,17 @@ export class Hud {
     if (s.castCharge !== null) this.meterFill.style.width = `${Math.round(s.castCharge * 100)}%`;
     this.bite.hidden = !(s.bite && s.biteIndicator);
     this.crosshair.hidden = !s.captured;
+    this.crosshair.classList.toggle('aiming', s.aiming);
+    this.crosshair.classList.toggle('blocked', !!s.aim && s.aim.kind === 'innocent');
+    this.ammo.hidden = !s.aiming || s.ammo === null;
+    if (s.aiming && s.ammo !== null) this.ammo.textContent = s.reloading ? 'reloading…' : `${s.ammo} rounds`;
+    if (s.aim && s.aiming) {
+      this.target.hidden = false;
+      this.target.dataset.kind = s.aim.kind;
+      this.targetName.textContent = s.aim.name;
+      this.targetRing.style.setProperty('--t', String(Math.round(s.aim.progress * 360)));
+    } else this.target.hidden = true;
+    this.hearts.classList.toggle('boat', s.boat);
     this.clickToPlay.hidden = s.captured || !this.clickEnabled;
     this.saveIcon.hidden = !s.saving;
     if (this.areaTimer > 0) {
@@ -190,6 +218,16 @@ export class Hud {
       b.el.style.left = `${p.x}px`;
       b.el.style.top = `${p.y}px`;
     }
+  }
+
+  /** Move the aim target ring to its owner's screen position (null when off-screen). */
+  placeTarget(p: { x: number; y: number } | null): void {
+    if (!p) {
+      this.target.hidden = true;
+      return;
+    }
+    this.target.style.left = `${p.x}px`;
+    this.target.style.top = `${p.y}px`;
   }
 
   /** The rummaging progress ring above a thief (0..1); null hides it. */

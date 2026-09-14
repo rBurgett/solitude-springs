@@ -51,17 +51,24 @@ export class GatorRunner extends EventRunner {
     const gator = this.gator!;
     if (this.done) return;
     const p = h.player.feet;
-    const near = h.world.valley.edgeDistance(p.x, p.z) < E.gatorLungeRange;
+    const inBoat = h.inBoat();
+    const near = inBoat || h.world.valley.edgeDistance(p.x, p.z) < E.gatorLungeRange;
     if (near && !this.scared) {
       this.phase = 'lunge';
       this.lunged = true;
-      const target = new THREE.Vector3(p.x, p.y, p.z);
-      target.lerp(this.bank, 0.35);
+      const target = new THREE.Vector3(p.x, inBoat ? 0 : p.y, p.z);
+      if (!inBoat) target.lerp(this.bank, 0.35);
       gator.lunge(target);
       h.audio?.gatorSnap();
       h.audio?.bigSplash();
-      const knock = new THREE.Vector3(p.x - gator.position.x, 0, p.z - gator.position.z).normalize().multiplyScalar(E.gatorKnockback);
-      h.damage(E.gatorHeartsBank, knock);
+      if (inBoat) {
+        // in the boat: the hull takes it, the boat rocks, one heart (§11.4 "Alligator" 2)
+        h.rockBoat();
+        h.damage(E.gatorHeartsBoat);
+      } else {
+        const knock = new THREE.Vector3(p.x - gator.position.x, 0, p.z - gator.position.z).normalize().multiplyScalar(E.gatorKnockback);
+        h.damage(E.gatorHeartsBank, knock);
+      }
       h.stats.gatorBites++;
       h.caption('CHOMP.');
       h.bus.emit('gatorBit', {});
@@ -83,7 +90,12 @@ export class GatorRunner extends EventRunner {
     if (this.timer > 20) this.finish();
   }
 
-  /** M3: attacking toward it during the approach sends it under (achievement See You Later). */
+  override threatTarget(): { position: THREE.Vector3; radius: number; name: string } | null {
+    if (!this.gator || this.phase !== 'approach') return null;
+    return { position: this.gator.position.clone(), radius: 1.2, name: 'the alligator' };
+  }
+
+  /** Attacking toward it during the approach sends it under (achievement See You Later). */
   override onThreatened(): void {
     if (this.phase !== 'approach' || this.scared) return;
     this.scared = true;

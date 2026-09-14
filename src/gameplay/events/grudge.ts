@@ -54,6 +54,8 @@ export class GrudgeRunner extends EventRunner {
     npc.face(h.player.feet);
     npc.lookAt(h.player.feet);
     this.phase = 'demand';
+    // making demands: Threatening, so a drawn weapon works on them without raising wanted (§12.2)
+    h.setStance(def.id, 'threatening');
     // the most valuable thing the player carries that isn't bound
     let best: { id: string; count: number; color?: string } | null = null;
     for (const s of h.inventory.slots) if (s && !itemDef(s.id).bound && (!best || itemDef(s.id).value > itemDef(best.id).value)) best = s;
@@ -76,7 +78,7 @@ export class GrudgeRunner extends EventRunner {
       },
     };
     const end = await h.talk(npc, tree);
-    if (this.done) return;
+    if (this.done || this.phase === 'fight') return;
     if (end === 'gave' && best) {
       h.takeItem(best.id, best.count);
       addStolen(mem, [{ ...best }]);
@@ -84,11 +86,11 @@ export class GrudgeRunner extends EventRunner {
       mem.relationship += 5;
       h.toast(`${def.name} takes the ${want}. The grudge is settled.`);
     } else if (end === 'refused') {
-      // a punch (§12.2 hostile attacks: punch −1 heart), then they leave, still holding the grudge
-      npc.act('punch_cross', { loop: false, onFinished: () => npc.act(null) });
-      h.audio?.hurt();
-      h.damage(1, new THREE.Vector3(h.player.feet.x - npc.feet.x, 0, h.player.feet.z - npc.feet.z).normalize().multiplyScalar(2));
-      h.toast(`${def.name} punches you and storms off. The grudge stands.`, 'warn');
+      // "or fight" (§11.4): they draw; the combat system runs the fight from here (§12.2)
+      this.phase = 'fight';
+      h.toast(`${def.name} draws. Wrong answer.`, 'warn');
+      h.engageHostile(npc, false);
+      return;
     } else {
       h.toast(`${def.name} storms off.`);
     }
@@ -124,6 +126,11 @@ export class GrudgeRunner extends EventRunner {
     }
     this.timer += dt;
     const npc = this.npc;
+    if (this.phase === 'fight') {
+      // the combat system has them; it despawns them when the fight resolves (onNpcGone)
+      if (!npc || !h.npcs.get(npc.def.id)) this.finish();
+      return;
+    }
     if (this.leaving && npc) {
       // a leaver who is stuck, or still about after the timeout, goes home directly: the event must end
       if (h.npcs.get(npc.def.id) && (npc.stuckFor > E.stuckSeconds || this.timer > E.leaveTimeoutSeconds)) h.npcs.despawn(npc.def.id);
@@ -135,6 +142,28 @@ export class GrudgeRunner extends EventRunner {
 
   ringState(): ReturnType<ThiefRunner['ringState']> {
     return this.inner?.ringState() ?? null;
+  }
+
+  /** Aimed at while approaching or demanding: an armed grudge draws (the combat system makes them hostile). */
+  override onThreatened(npcId?: string): void {
+    if (this.inner) return this.inner.onThreatened(npcId);
+    if (!this.npc || (npcId && npcId !== this.npc.def.id) || this.done) return;
+    if (this.phase === 'approach' || this.phase === 'demand') {
+      this.phase = 'fight';
+      if (this.h.isDialogueOpen()) this.h.closeDialogue();
+    }
+  }
+
+  override onRobbed(npcId: string): void {
+    this.inner?.onRobbed(npcId);
+  }
+
+  override onNpcGone(npcId: string, reason: 'poofed' | 'fled'): void {
+    if (this.inner) return this.inner.onNpcGone(npcId, reason);
+    if (!this.npc || npcId !== this.npc.def.id) return;
+    this.h.stats.grudgesHandled++;
+    this.h.unlockChecks();
+    this.finish();
   }
 
   protected override cleanup(): void {

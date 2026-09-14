@@ -14,6 +14,8 @@ export interface JournalActions {
   stats: StatsState;
   achievements: Record<string, string>;
   npcs?: Record<string, NpcMemory>;
+  /** Progress toward a counter achievement (M3), null when it has none. */
+  progress?(id: string): { current: number; target: number } | null;
   onClose(): void;
 }
 
@@ -50,7 +52,21 @@ export function journalScreen(a: JournalActions): HTMLElement {
         }))
       : el('p', { class: 'hint' }, 'Nobody yet. Enjoy it while it lasts.'),
   ]);
-  pages.achievements = el('div', { class: 'tab-page' }, ACHIEVEMENTS.filter((x) => !x.secret || a.achievements[x.id]).map((x) => el('div', { class: `ach${a.achievements[x.id] ? '' : ' locked'}` }, [el('span', {}, a.achievements[x.id] ? '🏅' : '🔒'), el('div', {}, [el('div', {}, x.name), el('div', { class: 'hint' }, x.description)])])));
+  const unlockedCount = ACHIEVEMENTS.filter((x) => a.achievements[x.id]).length;
+  const when = new Intl.DateTimeFormat(undefined, { dateStyle: 'medium', timeStyle: 'short' });
+  const secretsLeft = ACHIEVEMENTS.filter((x) => x.secret && !a.achievements[x.id]).length;
+  pages.achievements = el('div', { class: 'tab-page' }, [
+    el('p', { class: 'hint' }, `${unlockedCount} of ${ACHIEVEMENTS.length} earned${secretsLeft ? ` · ${secretsLeft} secret` : ''}`),
+    ...ACHIEVEMENTS.map((x) => {
+      const at = a.achievements[x.id];
+      const secret = x.secret && !at;
+      const prog = !at && !secret ? a.progress?.(x.id) ?? null : null;
+      const parts: HTMLElement[] = [el('div', {}, secret ? '???' : x.name), el('div', { class: 'hint' }, secret ? 'A secret. You will know it when it happens.' : x.description)];
+      if (at) parts.push(el('div', { class: 'when' }, `Earned ${when.format(new Date(at))}`));
+      else if (prog) parts.push(el('div', { class: 'when' }, `${prog.current} / ${prog.target}`), el('div', { class: 'progress' }, [el('div', { style: `width:${Math.round((prog.current / Math.max(1, prog.target)) * 100)}%` })]));
+      return el('div', { class: `ach${at ? '' : ' locked'}`, 'data-ach': x.id }, [el('span', {}, at ? '🏅' : secret ? '❔' : '🔒'), el('div', {}, parts)]);
+    }),
+  ]);
   for (const [k, label] of [['fish', 'Fish log'], ['messages', 'Messages'], ['people', 'People'], ['achievements', 'Achievements']] as const) tabs.append(el('button', { 'data-tab': k, onclick: () => show(k) }, label));
   show('fish');
   return el('div', { class: 'screen dim' }, [

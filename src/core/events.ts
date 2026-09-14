@@ -43,6 +43,12 @@ export interface GameEvents {
   damaged: { hearts: number };
   serenityChanged: { value: number };
   lull: { started: boolean };
+  // M3 (§12)
+  robbery: { npcId: string; items: { id: string; count: number }[]; wanted: number };
+  hostile: { npcId: string };
+  poof: { npcId: string; hostile: boolean };
+  confiscation: { npcId: string; weapon: string | null; fine: string | null };
+  boarded: { inBoat: boolean };
 }
 
 type Handler<T> = (payload: T) => void;

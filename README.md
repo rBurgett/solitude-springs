@@ -8,14 +8,16 @@ The design and build plan lives in [`plans/`](plans/); the current plan is the s
 
 ## Status
 
-M2 ("The interruptions") is built and awaiting the owner's checkpoint. On top of the M1 slice
-(the valley, the creator, the fishing loop, inventory and clothing, saves, menus, generative audio)
-the world now has people and problems: the 58-name roster with dialogue, trading and memory; the
-Annoyance Director (serenity, grace periods, pacing, lulls); camper and hiker visits; water-walkers;
-thieves (with the strip and the pity barrel); parties that trash a zone (brown grass, cans,
-beer-coloured water); the bear; the alligator; UFO abductions; grudge returns; health and death; the
-tutorial narrator. Weapons, the ranger and the boat arrive in M3. See the plan's milestone list (§20)
-for status and known gaps.
+M3 ("Weapons, consequences & the full cast") is built and awaiting the owner's checkpoint. On top of
+the M1 slice (the valley, the creator, the fishing loop, inventory and clothing, saves, menus,
+generative audio) and M2 (the 58-name roster with dialogue, trading and memory; the Annoyance
+Director; visits, water-walkers, thieves, parties, the bear, the alligator, UFO abductions, grudge
+returns; health and death; the tutorial narrator), the world now has consequences: the knife, handgun
+and rifle with an over-the-shoulder aim; the confrontation rules (weapons never fire at an innocent —
+they put their hands up and a robbery dialogue opens, or, if armed, draw and fight back; thieves
+surrender or fight; hostiles poof in a red cloud and leave a loot bag); the hidden wanted value and
+the Park Ranger who confiscates your best weapon; the rowboat; the Map screen; every achievement with
+dates and progress in the Journal. See the plan's milestone list (§20) for status and known gaps.
 
 ## Running it
 
@@ -30,13 +32,17 @@ npm run dev          # Vite dev server → http://localhost:5173/  (the game is 
 ```
 
 Controls (rebindable in **Controls**): W A S D move, mouse look, Space jump, Shift sprint,
-**right mouse** hold to charge a cast / release to cast / press to reel, F interact, E inventory,
-Q drop, 1–9, wheel or [ ] hotbar, V camera distance, J journal, Esc pause. In the inventory: click an
-item, then click where it goes (or drag), shift-click splits, double-click equips or uses. In a
-conversation: click or Space continues, 1–4 pick a choice, Esc leaves. Dev builds open the debug console with `` ` ``
+**right mouse** hold to charge a cast / release to cast / press to reel — or, with a weapon selected,
+hold to aim (over the shoulder, a ring on whoever is under the crosshair) and **left mouse** to fire or
+stab; F interact (talk, pick up, board or leave the boat), E inventory, Q drop, 1–9, wheel or [ ]
+hotbar, V camera distance, J journal, M map, Esc pause. In the boat: W/S row, A/D turn, F steps out
+at a bank or the dock; casting works while it is nearly stopped. In the inventory: click an item, then
+click where it goes (or drag), shift-click splits, double-click equips or uses. In a conversation:
+click or Space continues, 1–4 pick a choice, Esc leaves. Dev builds open the debug console with `` ` ``
 (`help` lists commands: `event <type> [npc]`, `npc <id>`, `talk <id>`, `endevent`, `lull`,
-`director on|off|now`, `tutorial skip`, `grudge <id>`, `time`, `day`, `give`, `outfit`, `strip`,
-`tp`, `trash`, `damage`, `heal`, `kill`, `speed`, `bite`, `catch`, `stats`, …).
+`director on|off|now`, `tutorial skip`, `grudge <id>`, `wanted <n>`, `poof <id>`, `hostile <id>`,
+`stance <id> <stance>`, `combat`, `boat here|dock`, `board`, `leave`, `time`, `day`, `give`, `outfit`,
+`strip`, `tp`, `trash`, `damage`, `heal`, `kill`, `speed`, `bite`, `catch`, `stats`, …).
 
 Lab pages (look-dev, not part of the game) are indexed at `lab/index.html`: the character bake-off
 and the M1 player bodies (`lab/characters.html`), the animation flip-books (`?shot=anim&clip=…`),
@@ -49,7 +55,7 @@ npm run typecheck    # strict TypeScript
 npm test             # node --test suites in tests/ (sim, saves, terrain)
 npm run deps:check   # every resolved package version is ≥ 14 days old
 npm run build        # production build into dist/
-npm run smoke        # headless Chromium over CDP plays the M1 path, then forces every M2 event; fails on console errors
+npm run smoke        # headless Chromium over CDP plays the M1 path, forces every M2 event, then the M3 flows (robbery, poof, ranger, boat); fails on console errors
 npm run simulate     # Director + fishing Monte Carlo report against the pacing targets (fails if one is missed)
 npm run shots        # look-dev screenshot sets into shots-out/ (--set=…, --gpu for the real GPU)
 npm run perf         # frame times per graphics preset on the real GPU (--preset=medium,high)

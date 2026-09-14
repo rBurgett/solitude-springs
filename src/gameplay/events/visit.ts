@@ -59,6 +59,19 @@ export class VisitRunner extends EventRunner {
     this.linger = Math.max(this.linger, 45);
   }
 
+  /** Robbed at gunpoint: they leave right now. */
+  override onRobbed(npcId: string): void {
+    const npc = this.visitors.find((n) => n.def.id === npcId);
+    if (!npc) return;
+    this.h.bubble(npc, 'Unbelievable. UNBELIEVABLE.', 3);
+    this.linger = 0;
+  }
+
+  override onNpcGone(npcId: string): void {
+    this.visitors = this.visitors.filter((n) => n.def.id !== npcId);
+    if (!this.visitors.length) this.finish();
+  }
+
   step(dt: number): void {
     const h = this.h;
     if (this.done) return;

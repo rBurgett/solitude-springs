@@ -1,5 +1,5 @@
 // Save record (plan §14.2). Dates are ISO 8601 UTC strings; the load screen localizes them (§14.4).
-import type { InventoryState } from '../inventory.ts';
+import type { InventoryState, ItemStack } from '../inventory.ts';
 import type { ClockState } from '../clock.ts';
 import type { JournalState, StatsState } from '../journal.ts';
 import type { NpcMemory } from '../npcMemory.ts';
@@ -22,6 +22,8 @@ export interface PickupRecord {
   count: number;
   color?: string;
   position: [number, number, number];
+  /** A loot bag's contents (M3, §12.2): picking it up gives every stack. */
+  contents?: ItemStack[];
 }
 
 export interface ZoneRecord {

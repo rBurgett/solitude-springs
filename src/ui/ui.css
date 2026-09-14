@@ -142,6 +142,25 @@ select { font: 1rem var(--font-ui); padding: 6px 10px; border-radius: 10px; bord
 .hud-slot-count { position: absolute; right: 5px; bottom: 2px; font-size: 0.75rem; }
 .hud-prompt { position: absolute; left: 50%; top: 58%; transform: translateX(-50%); background: rgba(20, 30, 24, 0.6); padding: 6px 14px; border-radius: 999px; }
 .hud-crosshair { position: absolute; left: 50%; top: 50%; width: 6px; height: 6px; margin: -3px; border-radius: 50%; background: rgba(255, 255, 255, 0.8); box-shadow: 0 0 0 1px rgba(0,0,0,0.5); }
+.hud-crosshair.aiming { width: 22px; height: 22px; margin: -11px; background: transparent; border: 2px solid rgba(255, 255, 255, 0.9); box-shadow: 0 0 0 1px rgba(0,0,0,0.5), inset 0 0 0 1px rgba(0,0,0,0.4); transition: width 0.12s, height 0.12s, margin 0.12s; }
+.hud-crosshair.aiming::after { content: ''; position: absolute; left: 50%; top: 50%; width: 4px; height: 4px; margin: -2px; border-radius: 50%; background: rgba(255, 255, 255, 0.95); }
+.hud-crosshair.aiming.blocked { border-color: rgba(255, 226, 120, 0.95); border-style: dashed; }
+.hud-ammo { position: absolute; left: calc(50% + 34px); top: calc(50% - 34px); font-size: 0.85rem; background: rgba(20, 30, 24, 0.55); padding: 2px 10px; border-radius: 999px; }
+.hud-target { position: absolute; transform: translate(-50%, -50%); display: grid; place-items: center; pointer-events: none; }
+.hud-target-ring { --t: 0; width: 64px; height: 64px; border-radius: 50%; border: 2px solid rgba(255, 255, 255, 0.55); background: conic-gradient(rgba(255, 255, 255, 0.85) calc(var(--t) * 1deg), transparent 0); mask: radial-gradient(circle, transparent 28px, #000 29px); -webkit-mask: radial-gradient(circle, transparent 28px, #000 29px); }
+.hud-target-name { position: absolute; top: 100%; margin-top: 4px; white-space: nowrap; font-size: 0.85rem; background: rgba(20, 30, 24, 0.6); padding: 2px 10px; border-radius: 999px; }
+.hud-target[data-kind='hostile'] .hud-target-ring { border-color: rgba(233, 85, 106, 0.9); background: conic-gradient(rgba(233, 85, 106, 0.95) calc(var(--t) * 1deg), transparent 0); }
+.hud-target[data-kind='threatening'] .hud-target-ring { border-color: rgba(255, 190, 80, 0.9); background: conic-gradient(rgba(255, 190, 80, 0.95) calc(var(--t) * 1deg), transparent 0); }
+.hud-target[data-kind='animal'] .hud-target-ring { border-color: rgba(160, 220, 140, 0.9); }
+.hud-hearts.boat::after { content: ' 🚣'; font-size: 0.9rem; letter-spacing: 0; vertical-align: middle; }
+/* the poofed-hostile flash and the map */
+.map-canvas { display: block; max-width: 100%; max-height: 66vh; width: auto; margin: 0 auto; border-radius: 12px; box-shadow: var(--shadow); background: #efe6d2; }
+.panel.map { width: auto; min-width: 420px; }
+.map-legend { display: flex; gap: 14px; flex-wrap: wrap; font-size: 0.85rem; color: var(--ink-soft); margin-top: 8px; }
+.map-legend span::before { content: ''; display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-right: 5px; background: var(--dot, #888); vertical-align: middle; }
+.ach .when { color: var(--ink-soft); font-size: 0.8rem; }
+.ach .progress { height: 5px; background: rgba(44, 58, 46, 0.12); border-radius: 3px; overflow: hidden; margin-top: 4px; width: 160px; }
+.ach .progress > div { height: 100%; background: var(--moss); }
 .hud-meter { position: absolute; left: 50%; top: calc(50% + 18px); width: 120px; height: 8px; margin-left: -60px; background: rgba(0, 0, 0, 0.45); border-radius: 4px; overflow: hidden; }
 .hud-meter-fill { height: 100%; background: var(--sun); width: 0; }
 .hud-bite { position: absolute; left: 50%; top: 40%; transform: translateX(-50%); font: bold 3rem var(--font-serif); color: var(--sun); animation: pop 0.35s ease-in-out infinite alternate; }

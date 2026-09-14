@@ -9,6 +9,7 @@ import { BearRunner } from './bear.ts';
 import { GatorRunner } from './gator.ts';
 import { UfoRunner } from './ufo.ts';
 import { GrudgeRunner } from './grudge.ts';
+import { RangerRunner } from './ranger.ts';
 
 export function createRunner(type: EventType, host: EventHost, preferred?: string, opts: { scripted?: boolean } = {}): EventRunner | null {
   switch (type) {
@@ -30,10 +31,10 @@ export function createRunner(type: EventType, host: EventHost, preferred?: strin
     case 'grudge':
       return new GrudgeRunner(host, preferred);
     case 'ranger':
-      return null; // M3 (§12.3)
+      return new RangerRunner(host, preferred);
     default:
       return null;
   }
 }
 
-export { ThiefRunner, GrudgeRunner, PartyRunner };
+export { ThiefRunner, GrudgeRunner, PartyRunner, RangerRunner };

@@ -45,6 +45,17 @@ export function makeItemMesh(itemId: string, colorHex?: string): THREE.Object3D 
       stock.position.y = 0.18;
       return g;
     }
+    case 'loot_bag': {
+      const sack = add(new THREE.Mesh(new THREE.SphereGeometry(0.16, 12, 10), std(0x8a6a4a, { roughness: 0.9 })));
+      sack.scale.set(1, 1.15, 1);
+      sack.position.y = 0.17;
+      const neck = add(new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.08, 0.08, 8), std(0x6a4a2a)));
+      neck.position.y = 0.36;
+      const tie = add(new THREE.Mesh(new THREE.TorusGeometry(0.06, 0.012, 6, 12), std(0xc9a227, { metalness: 0.4, roughness: 0.4 })));
+      tie.rotation.x = Math.PI / 2;
+      tie.position.y = 0.34;
+      return g;
+    }
     case 'old_boot': {
       const shaft = add(new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.055, 0.16, 10), std(col)));
       shaft.position.y = 0.12;

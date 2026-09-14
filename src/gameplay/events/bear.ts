@@ -143,7 +143,13 @@ export class BearRunner extends EventRunner {
     void h.save('bear');
   }
 
-  /** M3: a drawn weapon during the approach sends it running (achievement Bear Necessities). */
+  /** Where a weapon attack has to point to scare it, while it is coming (§11.4). */
+  override threatTarget(): { position: THREE.Vector3; radius: number; name: string } | null {
+    if (!this.bear || (this.phase !== 'approach' && this.phase !== 'sniff')) return null;
+    return { position: new THREE.Vector3(this.bear.position.x, this.bear.position.y + 0.9, this.bear.position.z), radius: 1.5, name: 'the bear' };
+  }
+
+  /** A weapon attack toward it during the approach sends it running (achievement Bear Necessities). */
   override onThreatened(): void {
     if (this.phase !== 'approach' && this.phase !== 'sniff') return;
     this.scared = true;

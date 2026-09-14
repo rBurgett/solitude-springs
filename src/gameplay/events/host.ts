@@ -20,6 +20,8 @@ import type { EventLines, DialogueTree } from '../../data/dialogue.ts';
 import type { Settings } from '../../core/settings.ts';
 import type { NpcManager } from '../npcs.ts';
 import type { Npc } from '../../actors/npc.ts';
+import type { Stance } from '../../sim/confrontation.ts';
+import type { ItemStack as Stack } from '../../sim/inventory.ts';
 
 export interface EventHost {
   readonly world: World;
@@ -74,6 +76,17 @@ export interface EventHost {
   pickNpcsFor(type: EventType, count: number, preferred?: string): NpcDef[];
   /** An NPC with a grudge whose return is due (null if none). */
   grudgeCandidate(): NpcDef | null;
+  // ---- M3 (§12) ----
+  /** Mark an event NPC Threatening (a thief mid-theft, a grudge making demands) so weapons work on them. */
+  setStance(npcId: string, stance: Stance): void;
+  stanceOf(npcId: string): Stance;
+  /** Turn an NPC hostile right now (a refused demand, a threatened ranger); the combat system runs them from here. */
+  engageHostile(npc: Npc, wasInnocent: boolean): void;
+  /** Their goods (stock + loot + anything stolen), initialised on first use. */
+  npcGoods(def: NpcDef): Stack[];
+  inBoat(): boolean;
+  /** The boat rocks (a gator lunge at the hull). */
+  rockBoat(): void;
 }
 
 export abstract class EventRunner {
@@ -94,8 +107,16 @@ export abstract class EventRunner {
   render(_dt: number): void {}
   /** The player started talking to one of this event's NPCs. */
   onTalk(_npcId: string): void {}
-  /** M3: the player aimed/attacked toward the event's creature or NPC. */
-  onThreatened(): void {}
+  /** The player aimed at or attacked toward the event's creature or one of its NPCs (§12.2). */
+  onThreatened(_npcId?: string): void {}
+  /** One of this event's NPCs is gone for good: poofed, or fled as a hostile (the combat system despawned them). */
+  onNpcGone(_npcId: string, _reason: 'poofed' | 'fled'): void {}
+  /** The hands-up robbery (or a thief's surrender) of one of this event's NPCs is over: they should leave now. */
+  onRobbed(_npcId: string): void {}
+  /** The animal a weapon attack can scare during its approach (bear, gator): position and radius, or null. */
+  threatTarget(): { position: THREE.Vector3; radius: number; name: string } | null {
+    return null;
+  }
   /** Stop right now (console, quit). */
   abort(): void {
     this.finish();

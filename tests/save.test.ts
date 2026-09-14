@@ -26,7 +26,7 @@ function sample(): SaveRecord {
     player: { position: [12, 3.5, -40], facing: 1.2, health: 4, inBoat: false, inventory },
     world: { clock: { ...createClock(), day: 3 }, zones: { pool: { population: 0.8, trash: 0 }, sandy_bend: { population: 0.2, trash: 0.7 } }, boat: [1, 0, 2, 0.5], pickups: [{ id: 'p1', itemId: 'beer_can', count: 1, position: [1, 0, 1] }] },
     npcs: { barb: { met: 2, robbed: 0, poofed: 1, relationship: 12, grudge: false, inventory: [{ id: 'lucky_lure', count: 1 }], stolen: [], lastSeenDay: 2, poofedAt: 2.5, flags: { poofGreeted: true } } },
-    director: { wanted: 0, ufoRecentUntil: 0, lull: false, sessionSeconds: 1200, cooldownsRemaining: { thief: 120 }, lullScheduledDay: 3, lullAtFraction: 0.4, recent: { party: 2.9 }, eventsRun: 4 },
+    director: { wanted: 0, ufoRecentUntil: 0, lull: false, sessionSeconds: 1200, cooldownsRemaining: { thief: 120 }, lullScheduledDay: 3, lullAtFraction: 0.4, recent: { party: 2.9 }, eventsRun: 4, rangersBoth: false },
     progress: { achievements: { first_catch: '2026-09-05T17:10:00.000Z' }, stats: { ...createStats(), fishCaught: 3 }, journal, serenity: 0.7 },
     rng: { seed: 123, state: 456 },
   };

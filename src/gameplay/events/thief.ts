@@ -26,6 +26,9 @@ export class ThiefRunner extends EventRunner {
   private scripted: boolean;
   /** Grudge return: take at most one item. */
   private maxItems: number | null = null;
+  /** Threatened before the theft (M3): the theft never happens (achievement Not Today). */
+  private stopped = false;
+  private engagedFor = 0;
 
   constructor(h: EventHost, preferred?: string, opts: { scripted?: boolean; maxItems?: number } = {}) {
     super(h, preferred);
@@ -52,6 +55,8 @@ export class ThiefRunner extends EventRunner {
     markSeen(h.memoryFor(def.id), h.clock.day);
     this.npc = npc;
     npc.tag = 'busy';
+    // a thief is Threatening from the first step (§12.2): weapons work on them, an unarmed one surrenders when aimed at
+    h.setStance(def.id, 'threatening');
     this.phase = 'approach';
     if (this.sneak) {
       h.caption('*rustling behind you*');
@@ -127,6 +132,12 @@ export class ThiefRunner extends EventRunner {
     if (this.phase === 'flee') {
       this.fleeTimer += dt;
       if (this.fleeTimer > E.thiefGetawaySeconds || !h.npcs.get(npc.def.id) || d > 90) this.finish();
+      return;
+    }
+    if (this.phase === 'engaged') {
+      // the combat system has them (hands up, hostile, running): we wait for onRobbed / onNpcGone
+      this.engagedFor += dt;
+      if (!h.npcs.get(npc.def.id) || this.engagedFor > 240) this.finish();
     }
   }
 
@@ -207,8 +218,33 @@ export class ThiefRunner extends EventRunner {
     npc.onArrive = () => h.npcs.despawn(npc.def.id);
   }
 
-  override onThreatened(): void {
-    // M3: a thief caught mid-rummage or fleeing surrenders / returns the loot.
+  /** Aimed at or attacked (§11.4 "Resistance", §12.2): the combat system runs the surrender or the fight; the theft stops. */
+  override onThreatened(npcId?: string): void {
+    const npc = this.npc;
+    if (!npc || (npcId && npcId !== npc.def.id) || this.done) return;
+    if (this.phase === 'approach' || this.phase === 'rummage') {
+      if (!this.stopped) {
+        this.stopped = true;
+        this.h.stats.thievesStopped++;
+        this.h.unlockChecks();
+      }
+      this.h.hud.setRing(null);
+      npc.act(null);
+    }
+    if (this.phase !== 'engaged') {
+      this.phase = 'engaged';
+      this.engagedFor = 0;
+    }
+  }
+
+  /** The surrender (or a robbery of the thief) is over: they run, empty-handed. */
+  override onRobbed(npcId: string): void {
+    if (!this.npc || npcId !== this.npc.def.id || this.done) return;
+    this.flee(false);
+  }
+
+  override onNpcGone(npcId: string, _reason: 'poofed' | 'fled'): void {
+    if (this.npc && npcId === this.npc.def.id) this.finish();
   }
 
   protected override cleanup(): void {

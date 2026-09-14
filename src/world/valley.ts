@@ -259,7 +259,10 @@ export function createValley(seed = 2026): Valley {
     return { west: [wx, b.clearance, b.z], east: [ex, b.clearance, b.z] };
   };
   const dockRootX = riverCenterX(DOCK.z) + riverHalfWidth(DOCK.z) + 1.2;
-  const dock = { root: [dockRootX, 0.55, DOCK.z] as [number, number, number], end: [dockRootX - DOCK.length, 0.55, DOCK.z] as [number, number, number] };
+  // the dock reaches about the middle of the channel and no further (the river is narrow here; a
+  // full-length dock bridged it to the far bank, M3)
+  const dockLength = Math.min(DOCK.length, riverHalfWidth(DOCK.z) + 1.2 + 0.6);
+  const dock = { root: [dockRootX, 0.55, DOCK.z] as [number, number, number], end: [dockRootX - dockLength, 0.55, DOCK.z] as [number, number, number] };
 
   return {
     size: WORLD_SIZE,

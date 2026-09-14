@@ -187,6 +187,73 @@ export const TUNABLES = {
     /** How long a poofed NPC stays out of the pool (in-game days). */
     poofReturnDays: 1,
   },
+  /** §12.1–§12.3 weapons, confrontations and reputation. */
+  confrontation: {
+    /** Aiming at someone this long makes them react (hands up, or a drawn weapon). */
+    aimReactSeconds: 1.5,
+    /** NPC hit points and what each player weapon takes off: knife 2 hits, handgun 2 shots, rifle 1 (§12.2). */
+    npcHitPoints: 2,
+    playerHits: { knife: 1, handgun: 1, rifle: 2 },
+    /** A hostile down to this many hit points runs (§12.2 "they retreat when at 1 health"). */
+    retreatAtHp: 1,
+    /** Hostile attacks in hearts: punch, knife, handgun, rifle (§12.2). */
+    hostileHits: { punch: 1, knife: 1, handgun: 1, rifle: 2 },
+    /** Their aim is deliberately bad: the chance a hostile's shot lands. */
+    hostileAccuracy: 0.45,
+    shotSeconds: 2.2,
+    meleeSeconds: 1.6,
+    meleeReach: 1.9,
+    /** How close a hostile with a firearm walks before it starts shooting. */
+    gunStandoff: 7,
+    hostileFirstAttackDelay: 1.2,
+    /** Rounds between the short reload animations (handgun 8, rifle 5) and how long one takes (§12.1). */
+    reloadEvery: { handgun: 8, rifle: 5 },
+    reloadSeconds: 1.6,
+    /** Hitscan spread in radians (the rifle is tighter). */
+    spread: { handgun: 0.03, rifle: 0.012 },
+    /** Aim assist: how far a person may stand from the crosshair ray (metres) to be targeted, and to be hit. */
+    targetRadius: 0.9,
+    hitRadius: 0.6,
+    /** An attack toward an approaching animal within this cone (radians) and range scares it off (§11.4). */
+    animalThreatCone: 0.6,
+    animalThreatRange: 35,
+    /** Robbery outcomes (§12.2): relationship hits and the "Everything!" cap. */
+    robOneRelationship: -30,
+    robAllRelationship: -50,
+    robAllMaxItems: 3,
+    kiddingRelationship: -20,
+    /** Wanted (§12.3): robbing an innocent, threatening an armed innocent into a fight, poofing a ranger. */
+    wantedRobbery: 1,
+    wantedFight: 0.5,
+    wantedRangerPoof: 2,
+    /** A fleeing hostile or a robbed victim still about after this long goes home directly. */
+    leaveSeconds: 45,
+    /** The red poof: particle burst seconds. */
+    poofSeconds: 0.9,
+  },
+  /** §12.3 the Park Ranger: items taken as a fine on top of the best weapon; approach give-up. */
+  ranger: {
+    fineItems: 1,
+    approachTimeoutSeconds: 60,
+  },
+  /** §6 "Boat" / §7.2: the rowboat. */
+  boat: {
+    rowSpeed: 2.8,
+    reverseSpeed: 1.5,
+    acceleration: 2.2,
+    /** Speed lost per second when the oars rest. */
+    drag: 1.1,
+    turnRate: 1.3,
+    /** Bow/stern reach checked against the minimum depth (§7.2 "depth ≥ 0.5 m"). */
+    hullRadius: 0.9,
+    /** Casting works while the boat is nearly stopped (§6). */
+    castMaxSpeed: 0.4,
+    /** F boards within this distance of the boat; leaving needs land or the dock within `leaveRange`. */
+    boardRange: 3.2,
+    leaveRange: 5,
+    /** Seat height above the water. */
+    seatHeight: 0.32,
+  },
   /** §10 NPCs. */
   npc: {
     walkSpeed: 1.5,

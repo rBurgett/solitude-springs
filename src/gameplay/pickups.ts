@@ -3,6 +3,7 @@
 import * as THREE from 'three';
 import type { World } from '../world/world.ts';
 import type { PickupRecord } from '../sim/save/schema.ts';
+import type { ItemStack } from '../sim/inventory.ts';
 import { randomId } from '../core/rng.ts';
 import { makeItemMesh } from './itemMesh.ts';
 
@@ -23,6 +24,13 @@ export class PickupSystem {
 
   spawn(itemId: string, count: number, position: THREE.Vector3, color?: string): PickupRecord {
     const rec: PickupRecord = { id: randomId(), itemId, count, ...(color ? { color } : {}), position: [position.x, position.y, position.z] };
+    this.add(rec);
+    return rec;
+  }
+
+  /** A loot bag holding several stacks (a poofed NPC's pockets, §12.2). */
+  spawnBag(position: THREE.Vector3, contents: ItemStack[]): PickupRecord {
+    const rec: PickupRecord = { id: randomId(), itemId: 'loot_bag', count: 1, position: [position.x, position.y, position.z], contents: contents.map((c) => ({ ...c })) };
     this.add(rec);
     return rec;
   }
@@ -85,7 +93,7 @@ export class PickupSystem {
 
   restore(records: PickupRecord[]): void {
     this.clear();
-    for (const r of records) this.add({ ...r, position: [...r.position] as [number, number, number] });
+    for (const r of records) this.add({ ...r, position: [...r.position] as [number, number, number], ...(r.contents ? { contents: r.contents.map((c) => ({ ...c })) } : {}) });
   }
 
   clear(): void {

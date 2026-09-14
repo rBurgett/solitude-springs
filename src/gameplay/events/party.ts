@@ -8,6 +8,7 @@ import { TUNABLES } from '../../data/tunables.ts';
 import { markSeen } from '../../sim/npcMemory.ts';
 import { PartyMusic } from '../../audio/party.ts';
 import { whoop } from '../../audio/voices.ts';
+import { recentEvent } from '../../sim/director.ts';
 
 const E = TUNABLES.events;
 
@@ -121,7 +122,14 @@ export class PartyRunner extends EventRunner {
   override onTalk(npcId: string): void {
     const h = this.h;
     const npc = this.group.find((n) => n.def.id === npcId);
-    if (!npc || this.phase !== 'party' || this.cansGiven.has(npcId)) return;
+    if (!npc || this.phase !== 'party') return;
+    // Conga! (§13, secret): joining Destiny's line while the bear was just here
+    if (npcId === 'destiny' && recentEvent(h.director, 'bear', h.now(), 1 / 24) && !h.stats.congas) {
+      h.stats.congas++;
+      h.toast('You join the conga. The bear is somewhere close. This is fine.', 'achievement');
+      h.unlockChecks();
+    }
+    if (this.cansGiven.has(npcId)) return;
     if (h.rng.chance(0.5)) {
       this.cansGiven.add(npcId);
       h.give('beer_can', 1);
@@ -139,6 +147,23 @@ export class PartyRunner extends EventRunner {
 
   override onThreatened(): void {
     this.breakUp();
+  }
+
+  /** A partier poofed or run off: the party carries on without them, or ends when nobody is left. */
+  override onNpcGone(npcId: string): void {
+    this.group = this.group.filter((n) => n.def.id !== npcId);
+    if (this.group.length) return;
+    if (this.phase === 'arrive' || this.phase === 'party') this.endParty();
+    this.finish();
+  }
+
+  /** A robbed partier runs for it. */
+  override onRobbed(npcId: string): void {
+    const npc = this.group.find((n) => n.def.id === npcId);
+    if (!npc || !this.h.npcs.get(npcId)) return;
+    npc.tag = 'busy';
+    npc.goTo(this.h.npcs.exitPoint(npc.feet, () => this.h.rng.next()), TUNABLES.npc.fleeSpeed);
+    npc.onArrive = () => void this.h.npcs.despawn(npc.def.id);
   }
 
   step(dt: number): void {

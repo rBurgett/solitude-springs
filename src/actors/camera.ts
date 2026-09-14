@@ -9,6 +9,9 @@ export class ThirdPersonCamera {
   yaw = Math.PI;
   pitch = 0.25;
   distanceIndex = 1;
+  /** Over-the-shoulder aim (§12.1): closer, offset to the right, blended in over a few frames. */
+  aiming = false;
+  private aimBlend = 0;
   private currentDistance = TUNABLES.camera.distances[1]!;
   private target = new THREE.Vector3();
   private smoothTarget = new THREE.Vector3();
@@ -44,7 +47,12 @@ export class ThirdPersonCamera {
   }
 
   update(dt: number, feet: THREE.Vector3, physics: PhysicsWorld | null, heightAt?: (x: number, z: number) => number, exclude?: import('@dimforge/rapier3d-compat').Collider): void {
-    this.target.set(feet.x, feet.y + TUNABLES.camera.height, feet.z);
+    this.aimBlend += ((this.aiming ? 1 : 0) - this.aimBlend) * (1 - Math.exp(-10 * dt));
+    const a = this.aimBlend;
+    // the shoulder offset: to the camera's right, flattened
+    const rx = -Math.cos(this.yaw) * 0.55 * a;
+    const rz = Math.sin(this.yaw) * 0.55 * a;
+    this.target.set(feet.x + rx, feet.y + TUNABLES.camera.height + 0.05 * a, feet.z + rz);
     if (this.first) {
       this.smoothTarget.copy(this.target);
       this.first = false;
@@ -52,7 +60,7 @@ export class ThirdPersonCamera {
       const k = 1 - Math.exp(-TUNABLES.camera.smoothing * dt);
       this.smoothTarget.lerp(this.target, k);
     }
-    const wanted = TUNABLES.camera.distances[this.distanceIndex]!;
+    const wanted = TUNABLES.camera.distances[this.distanceIndex]! * (1 - a) + 1.7 * a;
     this.currentDistance += (wanted - this.currentDistance) * (1 - Math.exp(-6 * dt));
     // orbit direction (from the target toward the camera)
     const cp = Math.cos(this.pitch);

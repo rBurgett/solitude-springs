@@ -85,6 +85,8 @@ const BASE_ITEMS = [
   { id: 'lavender_oil', name: 'Lavender Oil', kind: 'consumable', stack: 5, value: 4, serenity: 0.2, description: 'Breathe in. Breathe out. Ignore everything.' },
   { id: 'lucky_lure', name: 'Lucky Lure', kind: 'misc', stack: 1, value: 12, description: 'Rare fish find it irresistible. So do thieves.' },
   { id: 'trash_bag', name: 'Trash Bag', kind: 'misc', stack: 1, value: 2, description: 'Cleaning counts double while you carry it.' },
+  // --- M3: what a poofed NPC leaves behind (§12.2); the pickup carries the contents ---
+  { id: 'loot_bag', name: 'Loot Bag', kind: 'misc', stack: 1, value: 0, description: 'Everything they had on them. Finders keepers is not a law.' },
   { id: 'headlamp', name: 'Headlamp', kind: 'clothing', stack: 1, value: 5, slot: 'hat', garment: 'fedora', emitsLight: true, palette: ['#2b2b2b'], description: 'For seeing. Also for being seen by aliens.' },
   // --- M2 clothing: the pity barrel, the tinfoil hat and the wetsuit (§11.4; procedural meshes, see character.ts) ---
   { id: 'barrel', name: 'Barrel', kind: 'clothing', stack: 1, value: 1, slot: 'full', garment: 'barrel', palette: ['#8a6a4a'], description: 'Suspenders included. Dignity not included.' },
@@ -127,7 +129,7 @@ const ICONS: Record<string, string> = {
   old_rod: '🎣', old_boot: '🥾', glass_bottle: '🍾', message_bottle: '📜', beer_can: '🥫', rubber_duck: '🦆', traffic_cone: '🔶', garden_gnome: '🧙', smartphone: '📱', car_keys: '🔑', trophy: '🏆', toilet_seat: '🚽', bowling_ball: '🎳',
   pocket_knife: '🔪', handgun: '🔫', rifle: '🎯', pistol_ammo: '📦', rifle_ammo: '📦', bandage: '🩹', granola_bar: '🍫', burger: '🍔', pizza_slice: '🍕', lavender_oil: '🧴', lucky_lure: '🪝', trash_bag: '🗑️', headlamp: '🔦',
   fedora: '🎩', sneakers: '👟', hiking_boots: '🥾', flats: '🥿', short_dress: '👗', sundress: '👗', ball_gown: '👗', swimsuit: '🩱', tuxedo: '🤵', jumpsuit: '👽', tshirt: '👕', polo: '👕', tank_top: '🎽', sweater: '🧥', pants: '👖', cargo_pants: '👖', shorts: '🩳', sweatpants: '👖',
-  barrel: '🛢️', tinfoil_hat: '🥫', wetsuit: '🤿', mre: '🥫', jerky: '🥩', mushrooms: '🍄', business_card: '💳', merit_badge: '🎖️', vibes: '✨',
+  barrel: '🛢️', tinfoil_hat: '🥫', loot_bag: '💰', wetsuit: '🤿', mre: '🥫', jerky: '🥩', mushrooms: '🍄', business_card: '💳', merit_badge: '🎖️', vibes: '✨',
 };
 
 /** Emoji glyph for the hotbar and inventory. */

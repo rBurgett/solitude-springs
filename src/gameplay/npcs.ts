@@ -62,15 +62,18 @@ export class NpcManager {
     return npc;
   }
 
-  despawn(id: string): void {
+  /** Remove an NPC. One the combat system holds (hands up, hostile) stays until it lets go, unless forced. */
+  despawn(id: string, force = false): boolean {
     const n = this.active.get(id);
-    if (!n) return;
+    if (!n) return true;
+    if (n.engaged && !force) return false;
     n.dispose();
     this.active.delete(id);
+    return true;
   }
 
   despawnAll(): void {
-    for (const id of [...this.active.keys()]) this.despawn(id);
+    for (const id of [...this.active.keys()]) this.despawn(id, true);
   }
 
   step(dt: number): void {

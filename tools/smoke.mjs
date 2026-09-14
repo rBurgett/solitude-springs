@@ -10,6 +10,11 @@
 // key beats — thief (strip → barrel), party (zero bites, cans clear the water), bear (fish only),
 // UFO (same spot, new clothes), water-walker, camper visit + dialogue + trade, gator, the pause
 // toggle, and save/load mid-trash.
+// M3 section (plan §20 M3 acceptance): weapons never fire at an innocent — aiming at unarmed Barb
+// opens the robbery; aiming at armed Wade makes him hostile and poofing him drops a loot bag; a thief
+// aimed at before the theft surrenders (Not Today) and a poofed thief's bag returns the stolen items;
+// two robberies bring the ranger (forced by the Director), who confiscates the best weapon; the boat
+// (board at the dock, row, a catch from it, step out); achievements survive a death; the Map screen.
 import path from 'node:path';
 import { launchChromium, startDevServer, parseArgs, reportConsole, ROOT, sleep } from './cdp.mjs';
 
@@ -600,6 +605,273 @@ try {
   expect(s.stats.abductions === 1 && s.achievements.includes('close_encounter'), 'abduction counted');
   await sleep(600);
   await shot('ufo-return');
+  // ===================== M3: weapons, consequences, the boat, the map =====================
+  /** Click through the closing lines of a conversation until it closes. */
+  const finishDialogue = async (timeout = 15_000) => {
+    const t0 = Date.now();
+    while (Date.now() - t0 < timeout) {
+      const x = await state();
+      if (x.overlay === 'none') return x;
+      if (x.dialogue && !x.dialogue.typing && !x.dialogue.choices.length) await ev('window.__ss.advance()');
+      await sleep(200);
+    }
+    throw new Error('timeout waiting for the dialogue to close');
+  };
+  const waitChoices = async () => {
+    for (let i = 0; i < 40; i++) {
+      const x = await state();
+      if (x.dialogue && x.dialogue.choices.length && !x.dialogue.typing) return x;
+      if (x.dialogue && !x.dialogue.choices.length && !x.dialogue.typing) await ev('window.__ss.advance()');
+      await sleep(200);
+    }
+    throw new Error('no dialogue choices');
+  };
+  /** Point the crosshair at an NPC and hold the aim (use) for `holdMs`. */
+  const aimAt = async (id, holdMs) => {
+    await ev(`window.__ss.aimAt(${JSON.stringify(id)})`);
+    await key('use', true);
+    await sleep(120);
+    await ev(`window.__ss.aimAt(${JSON.stringify(id)})`);
+    await sleep(holdMs);
+  };
+  const fire = async () => {
+    await key('attack', true);
+    await sleep(60);
+    await key('attack', false);
+  };
+  const selectSlot = async (n) => {
+    await key(`slot${n}`, true);
+    await sleep(60);
+    await key(`slot${n}`, false);
+  };
+  const clearBag = () => ev(`(() => { const inv = window.__ss.game.inventory; for (let i = 1; i < inv.slots.length; i++) inv.slots[i] = null; return true; })()`);
+  /** Spawn an NPC beside the player through the talk hook and close the greeting. */
+  const summon = async (id) => {
+    await ev(`window.__ss.talk(${JSON.stringify(id)})`);
+    await waitState((x) => x.overlay === 'dialogue' && x.dialogue?.npcId === id, `${id} greets`, 20_000);
+    await ev('window.__ss.closeOverlay()');
+    await waitState((x) => x.overlay === 'none', 'greeting closed', 10_000);
+  };
+  await run('time 12:00');
+  await run('tp campground');
+  await ev(`window.__ss.setSetting('gameplay.textSpeed', 3)`);
+  await sleep(600);
+
+  // --- weapons never fire at an innocent: aiming at unarmed Barb opens the robbery (§12.2) ---
+  await clearBag();
+  await run('give handgun 1');
+  await run('give pistol_ammo 12');
+  await summon('barb');
+  await selectSlot(2);
+  await aimAt('barb', 500);
+  s = await state();
+  expect(s.combat.aiming && s.combat.target === 'barb', `Barb under the crosshair (${JSON.stringify(s.combat)})`);
+  await shot('aim-barb');
+  await fire(); // the trigger stops short: no round spent, no damage
+  s = await state();
+  expect(s.inventory.some((i) => i === 'pistol_ammo×12'), 'no round spent on an innocent');
+  s = await waitState((x) => x.overlay === 'dialogue' && x.dialogue?.npcId === 'barb', "Barb's hands go up", 8_000);
+  await key('use', false);
+  await sleep(700);
+  await shot('hands-up');
+  s = await waitChoices();
+  expect(s.dialogue.choices[0].startsWith('Hand something'), `robbery menu (${s.dialogue.choices.join(' | ')})`);
+  await ev('window.__ss.chooseText("Hand something")');
+  s = await waitChoices();
+  await ev('window.__ss.choose(0)');
+  s = await finishDialogue();
+  console.log('  robbed Barb:', s.inventory.join(', '), 'wanted', s.director.wanted);
+  expect(s.director.wanted === 1 && s.stats.robberies === 1, 'a robbery adds +1 wanted');
+  expect(s.achievements.includes('trailway_robbery'), 'Trailway Robbery unlocked');
+  expect(s.memories.barb.grudge, 'Barb holds a grudge');
+
+  // --- aiming at armed Wade makes him hostile; poofing him drops a loot bag ---
+  await clearBag();
+  await run('give rifle 1');
+  await run('give rifle_ammo 12');
+  await run('heal');
+  await summon('wade');
+  await selectSlot(2);
+  await aimAt('wade', 1900);
+  s = await state();
+  expect(s.combat.stances.wade?.stance === 'hostile', `Wade hostile (${JSON.stringify(s.combat.stances.wade)})`);
+  expect(s.director.wanted === 1.5, `threatening an armed innocent adds +0.5 wanted (${s.director.wanted})`);
+  await shot('wade-hostile');
+  for (let i = 0; i < 8; i++) {
+    await ev('window.__ss.aimAt("wade")');
+    await sleep(150);
+    await fire();
+    await sleep(400);
+    s = await state();
+    if (!s.npcs.some((n) => n.id === 'wade')) break;
+  }
+  await key('use', false);
+  s = await state();
+  console.log('  Wade: shots', s.stats.shotsFired, 'poofs', s.stats.poofs, 'bags', JSON.stringify(s.pickupList.filter((p) => p.itemId === 'loot_bag').map((p) => p.contents)));
+  expect(s.stats.hostilesPoofed === 1, 'Wade poofed');
+  expect(s.pickupList.some((p) => p.itemId === 'loot_bag' && p.contents.some((c) => c.startsWith('rifle_ammo'))), "a loot bag with Wade's ammo");
+  expect(s.achievements.includes('poof_there_it_is'), 'Poof, There It Is unlocked');
+  expect(s.director.wanted === 1.5, 'poofing a hostile never raises wanted');
+  await sleep(300);
+  await shot('poof-bag');
+  await ev('window.__ss.pickupAll(6)');
+  s = await state();
+  expect(s.inventory.some((i) => i.startsWith('mre')), "Wade's MREs from the bag");
+  expect(s.memories.wade.poofed === 1 && s.memories.wade.grudge, 'the poof is remembered, with a grudge');
+
+  // --- a thief aimed at before the theft surrenders (Not Today); a poofed thief's bag returns the loot (Repo Man) ---
+  await run('tp campground');
+  await clearBag();
+  await run('give handgun 1');
+  await run('give pistol_ammo 12');
+  await selectSlot(2);
+  await forceEvent('thief', 'candy');
+  s = await waitState((x) => x.npcs.some((n) => n.id === 'candy'), 'Candy on her way', 20_000);
+  await aimAt('candy', 300);
+  s = await waitState((x) => x.overlay === 'dialogue' && x.dialogue?.npcId === 'candy', 'Candy surrenders', 15_000);
+  await key('use', false);
+  expect(s.stats.thievesStopped === 1, 'Not Today counted');
+  await shot('thief-surrender');
+  s = await waitChoices();
+  await ev('window.__ss.chooseText("Leave")');
+  s = await finishDialogue();
+  expect(s.achievements.includes('not_today'), 'Not Today unlocked');
+  await waitEvent((e) => e === null, 'the thief event to end', 90_000);
+  await run('tp campground');
+  await clearBag();
+  await run('give trophy 1');
+  await run('speed 2');
+  await forceEvent('thief', 'pete');
+  s = await waitEvent((e) => e && e.phase === 'flee', 'Pete to flee with the loot', 60_000);
+  await run('speed 1');
+  expect(s.memories.pete.stolen > 0 && !s.inventory.some((i) => i.startsWith('trophy')), 'Pete took the trophy');
+  await run('give handgun 1');
+  await run('give pistol_ammo 12');
+  await selectSlot(2);
+  let poofed = false;
+  for (let i = 0; i < 10 && !poofed; i++) {
+    await ev('window.__ss.aimAt("pete")');
+    await key('use', true);
+    await sleep(150);
+    await ev('window.__ss.aimAt("pete")');
+    await sleep(80);
+    await fire();
+    await sleep(350);
+    s = await state();
+    poofed = s.memories.pete.poofed >= 1;
+  }
+  await key('use', false);
+  expect(poofed, 'Pete poofed mid-getaway');
+  expect(s.pickupList.some((p) => p.itemId === 'loot_bag' && p.contents.some((c) => c.startsWith('trophy'))), 'the stolen trophy is in his bag');
+  expect(s.achievements.includes('repo_man'), 'Repo Man unlocked');
+  expect(s.director.wanted === 1.5, 'poofing a thief never raises wanted');
+  await waitEvent((e) => e === null, 'the thief event to end after the poof', 15_000);
+  await ev('window.__ss.pickupAll(8)');
+  s = await state();
+  expect(s.inventory.some((i) => i.startsWith('trophy')), 'the trophy is back');
+
+  // --- a second robbery → wanted 2 → the Director forces the ranger, who confiscates the best weapon ---
+  await run('tp campground');
+  await summon('trent');
+  await selectSlot(2);
+  await aimAt('trent', 1800);
+  s = await waitState((x) => x.overlay === 'dialogue' && x.dialogue?.npcId === 'trent', "Trent's hands go up", 8_000);
+  await key('use', false);
+  s = await waitChoices();
+  await ev('window.__ss.chooseText("Everything")');
+  s = await finishDialogue();
+  console.log('  robbed Trent:', s.inventory.join(', '), 'wanted', s.director.wanted);
+  expect(s.director.wanted >= 2, `two robberies reach the ranger threshold (${s.director.wanted})`);
+  await clearBag();
+  await run('give rifle 1');
+  await run('give pocket_knife 1');
+  await run('give rifle_ammo 6');
+  await run('give trophy 1');
+  await run('director on');
+  await run('director now');
+  s = await waitEvent((e) => e && e.type === 'ranger', 'the Director to send the ranger', 60_000);
+  await run('director off');
+  s = await waitState((x) => x.overlay === 'dialogue' && (x.dialogue?.npcId === 'rhonda' || x.dialogue?.npcId === 'tom'), "the ranger's lecture", 90_000);
+  await sleep(600);
+  await shot('ranger');
+  s = await waitChoices();
+  console.log('  ranger:', s.dialogue.npcId, '—', s.dialogue.line);
+  await ev('window.__ss.chooseText("Fine")');
+  s = await finishDialogue();
+  console.log('  after the ranger:', s.inventory.join(', '), 'wanted', s.director.wanted);
+  expect(!s.inventory.some((i) => i.startsWith('rifle×')), 'the rifle was confiscated');
+  expect(s.inventory.some((i) => i.startsWith('pocket_knife')), 'the lesser weapon stays');
+  expect(s.director.wanted === 0, 'wanted resets to 0');
+  expect(s.achievements.includes('most_wanted'), 'Most Wanted unlocked');
+  await waitEvent((e) => e === null, 'the ranger to leave', 150_000);
+
+  // --- the boat: board at the dock, row, a catch from it (Boat Life), step out ---
+  await run('tp dock');
+  await sleep(400);
+  expect(await ev('window.__ss.board()'), 'boarded at the dock');
+  s = await state();
+  expect(s.boat.inBoat, 'in the boat');
+  await ev(`window.__ss.setYaw(${Math.PI}, 0.3)`);
+  await sleep(500);
+  await shot('boat');
+  await key('forward', true);
+  await sleep(3000);
+  await key('forward', false);
+  await key('right', true);
+  await sleep(1000);
+  await key('right', false);
+  await sleep(2500);
+  s = await state();
+  console.log('  rowed', s.boat.metres.toFixed(1), 'm to', s.boat.x.toFixed(1), s.boat.z.toFixed(1));
+  expect(s.boat.metres > 3, 'the boat moved');
+  await selectSlot(1);
+  await ev(`window.__ss.setYaw(${Math.PI}, 0.3)`);
+  await key('use', true);
+  await sleep(900);
+  await key('use', false);
+  s = await waitState((x) => x.fishing === 'waiting' || x.fishing === 'idle', 'the cast to land', 10_000);
+  expect(s.fishing === 'waiting', `the cast landed on water (${s.fishing})`);
+  await run('catch fish');
+  await run('bite');
+  s = await waitState((x) => x.fishing === 'bite', 'a bite from the boat', 10_000);
+  await key('use', true);
+  await sleep(80);
+  await key('use', false);
+  s = await waitState((x) => x.stats.boatCatches >= 1, 'a catch from the boat', 15_000);
+  expect(s.achievements.includes('boat_life'), 'Boat Life unlocked');
+  await shot('boat-catch');
+  await run('boat dock');
+  await ev('window.__ss.board()');
+  expect(await ev('window.__ss.leave()'), 'stepped out at the dock');
+  s = await state();
+  expect(!s.boat.inBoat, 'ashore');
+
+  // --- achievements persist across death; the boat returns to the dock (§12.4) ---
+  const achBefore = [...s.achievements].sort();
+  await run('give fish_bluegill 3');
+  await run('kill');
+  await sleep(500);
+  s = await state();
+  expect(achBefore.every((id) => s.achievements.includes(id)), 'achievements kept through death');
+  expect(s.achievements.includes('poof'), 'Poof! unlocked by dying');
+  expect(!s.inventory.some((i) => i.startsWith('fish_')), 'the fish are lost');
+  expect(s.inventory.some((i) => i.startsWith('pocket_knife')), 'everything else is kept');
+  expect(s.pos[2] < -200, 'woke at the trailhead');
+
+  // --- the Map screen and the Journal's achievements with dates ---
+  await ev('window.__ss.openOverlay("map")');
+  await sleep(500);
+  await shot('map');
+  await ev('window.__ss.closeOverlay()');
+  await ev('window.__ss.openOverlay("journal")');
+  await sleep(300);
+  await ev(`(() => { const b = [...document.querySelectorAll('.tabs button')].find((x) => x.dataset.tab === 'achievements'); b?.click(); return !!b; })()`);
+  await sleep(300);
+  await shot('journal-achievements');
+  const dated = await ev(`document.querySelectorAll('.ach:not(.locked) .when').length`);
+  expect(dated >= 5, `earned achievements show their dates (${dated})`);
+  await ev('window.__ss.closeOverlay()');
+
   const fps = await browser.measureFps(1500);
   console.log(`  fps (${flags.gpu ? 'gpu' : 'swiftshader'}) ~ ${fps.toFixed(1)}  draws ${s.draws} tris ${s.tris}`);
 } catch (err) {

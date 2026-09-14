@@ -39,6 +39,9 @@ export class Npc {
   tag = '';
   /** Water-walkers stride along the surface until the bank takes over. */
   waterLevelWalk = false;
+  /** Held by the combat system (hands up, hostile, surrendering): runners may not despawn them until it lets go (M3). */
+  engaged = false;
+  private weaponMesh: THREE.Object3D | null = null;
   /** Waypoints to follow (world positions). */
   private path: THREE.Vector3[] = [];
   private speed: number = N.walkSpeed;
@@ -175,6 +178,29 @@ export class Npc {
   gesture(clip: string, opts: { loop?: boolean; onFinished?: () => void } = {}): void {
     const an = this.character.animator;
     an.playUpper(clip, { fade: 0.2, loop: opts.loop ?? false, onFinished: () => { an.clearUpper(0.3); opts.onFinished?.(); } });
+  }
+
+  /** A drawn weapon in the right hand (hostiles, §12.2); null puts it away. */
+  holdWeapon(mesh: THREE.Object3D | null): void {
+    if (this.weaponMesh) {
+      this.weaponMesh.removeFromParent();
+      this.weaponMesh.traverse((o) => {
+        const m = o as THREE.Mesh;
+        if (m.isMesh) {
+          m.geometry.dispose();
+          (m.material as THREE.Material).dispose();
+        }
+      });
+      this.weaponMesh = null;
+    }
+    if (!mesh) return;
+    const grip = new THREE.Group();
+    grip.position.set(0.05, 0.015, 0.01);
+    grip.quaternion.setFromEuler(new THREE.Euler(0, 0, -Math.PI / 2));
+    mesh.position.y = -0.06;
+    grip.add(mesh);
+    this.character.attach(grip, 'hand_r');
+    this.weaponMesh = grip;
   }
 
   /** Teleport (spawning, the water-walker rise). */
@@ -334,6 +360,7 @@ export class Npc {
   }
 
   dispose(): void {
+    this.holdWeapon(null);
     if (this.body) this.world.physics.world.removeRigidBody(this.body);
     this.body = null;
     this.drips?.geometry.dispose();

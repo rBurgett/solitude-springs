@@ -13,6 +13,8 @@ export interface JournalState {
   messages: string[];
   /** NPC ids met (M2). */
   people: string[];
+  /** Garments fished up (`id:colour`), for Dressed by the River (M3). */
+  fishedGarments: string[];
 }
 
 export interface StatsState {
@@ -53,10 +55,32 @@ export interface StatsState {
   worstDayStripped: number;
   worstDayBear: number;
   deaths: number;
+  // M3 (§12, §13)
+  /** Robberies the player committed. */
+  robberies: number;
+  /** Hostile NPCs poofed. */
+  hostilesPoofed: number;
+  /** Every NPC poofed (rangers included). */
+  poofs: number;
+  /** Thieves stopped before they took anything. */
+  thievesStopped: number;
+  /** Stolen items recovered (surrender, loot bag, robbing them back). */
+  stolenRecovered: number;
+  /** Ranger confiscations. */
+  confiscations: number;
+  shotsFired: number;
+  boatMetres: number;
+  /** Real seconds spent wearing a dress / tuxedo as a character who didn't start in one. */
+  dressWornSeconds: number;
+  tuxedoWornSeconds: number;
+  /** Times a full outfit of fished-up clothes was worn. */
+  riverOutfits: number;
+  /** Conversations with Conspiracy Carl while wearing the Tinfoil Hat (Believer). */
+  tinfoilTalks: number;
 }
 
 export function createJournal(): JournalState {
-  return { species: {}, messages: [], people: [] };
+  return { species: {}, messages: [], people: [], fishedGarments: [] };
 }
 
 export function createStats(): StatsState {
@@ -64,6 +88,7 @@ export function createStats(): StatsState {
     fishCaught: 0, junkCaught: 0, clothingCaught: 0, castsMade: 0, treesHit: 0, bitesMissed: 0, cansCollected: 0, metresWalked: 0, bestFishLb: 0, nightCatches: 0, nibbleReels: 0, bootsCaught: 0, firearmsCaught: 0, beerCasts: 0, boatCatches: 0,
     timesRobbed: 0, timesStripped: 0, barrelsReceived: 0, abductions: 0, abductedMidConversation: 0, gatorBites: 0, fishLostToBears: 0, bearsScared: 0, gatorsScared: 0, partiesBroken: 0, tradesCompleted: 0, junkForTreasure: 0, zonesCleaned: 0, congas: 0, eventsSurvived: 0, grudgesHandled: 0,
     worstDayRobbed: 0, worstDayStripped: 0, worstDayBear: 0, deaths: 0,
+    robberies: 0, hostilesPoofed: 0, poofs: 0, thievesStopped: 0, stolenRecovered: 0, confiscations: 0, shotsFired: 0, boatMetres: 0, dressWornSeconds: 0, tuxedoWornSeconds: 0, riverOutfits: 0, tinfoilTalks: 0,
   };
 }
 
@@ -109,4 +134,14 @@ export function recordPerson(j: JournalState, npcId: string): boolean {
 
 export function speciesSeen(j: JournalState): number {
   return Object.keys(j.species).length;
+}
+
+/** Remember a fished-up garment so a full outfit of them can be recognised later. */
+export function recordFishedGarment(j: JournalState, id: string, color?: string): void {
+  const key = garmentKey(id, color);
+  if (!j.fishedGarments.includes(key)) j.fishedGarments.push(key);
+}
+
+export function garmentKey(id: string, color?: string): string {
+  return `${id}:${color ?? ''}`;
 }

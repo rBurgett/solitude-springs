@@ -9,6 +9,11 @@ import { ThirdPersonCamera } from './actors/camera.ts';
 import { FishingSystem, type FishingHost } from './gameplay/fishing.ts';
 import { PickupSystem } from './gameplay/pickups.ts';
 import { HeldItem } from './gameplay/heldItem.ts';
+import { CombatSystem, type CombatHost } from './gameplay/combat.ts';
+import { Boat } from './actors/boat.ts';
+import { canCastFromBoat } from './sim/boat.ts';
+import { isWeapon, type Stance } from './sim/confrontation.ts';
+import { mapScreen } from './ui/screens/map.ts';
 import { NpcManager } from './gameplay/npcs.ts';
 import type { Npc } from './actors/npc.ts';
 import { Conversation, type ConversationHost } from './gameplay/conversation.ts';
@@ -34,7 +39,7 @@ import { Rng, randomId, randomSeed } from './core/rng.ts';
 import { putStoredSave } from './core/storage.ts';
 import { TUNABLES } from './data/tunables.ts';
 import { ZONES, SPAWN } from './data/world.ts';
-import { itemDef, isKnownItem } from './data/items.ts';
+import { itemDef, isKnownItem, type ItemDef } from './data/items.ts';
 import { ACHIEVEMENT_BY_ID } from './data/achievements.ts';
 import { fishDef, FISH_BY_ID } from './data/fish.ts';
 import { NPCS, npcDef, isKnownNpc, type NpcDef } from './data/npcs.ts';
@@ -45,8 +50,8 @@ import { createClock, advanceClock, phaseOf, formatClock, setClockTime, cycleFra
 import { createZoneState, recoverZone, onCatch as zoneOnCatch, onCanPickedUp, isTrashed, type ZoneState } from './sim/zones.ts';
 import { createInventory, addItem, takeSlot, selectedStack, selectSlot, outfitOf, removeItem, equipFromSlot, removeAllFish, hasItem, countItem, type InventoryState, type ItemStack } from './sim/inventory.ts';
 import { MESSAGES } from './data/messages.ts';
-import { createJournal, createStats, pickMessage, recordMessage, recordCatch, recordPerson, type JournalState, type StatsState } from './sim/journal.ts';
-import { checkAchievements } from './sim/achievements.ts';
+import { createJournal, createStats, pickMessage, recordMessage, recordCatch, recordPerson, recordFishedGarment, garmentKey, type JournalState, type StatsState } from './sim/journal.ts';
+import { checkAchievements, achievementProgress } from './sim/achievements.ts';
 import { rollFish, rollJunk, rollClothing, rollWeight, biteWindowFor, type CatchContext, type CatchResult } from './sim/catchTable.ts';
 import type { FishingEvent } from './sim/fishing.ts';
 import { SCHEMA_VERSION, type CharacterRecord, type SaveRecord } from './sim/save/schema.ts';
@@ -76,10 +81,11 @@ export interface GameHost {
 
 export type GameSource = { character: CharacterRecord } | { save: SaveRecord };
 
-type Overlay = 'none' | 'pause' | 'inventory' | 'journal' | 'settings' | 'controls' | 'dialogue' | 'trade';
+type Overlay = 'none' | 'pause' | 'inventory' | 'journal' | 'map' | 'settings' | 'controls' | 'dialogue' | 'trade';
 
 const BARK_ORDER: BarkCategory[] = ['barrel', 'underwear', 'manInDress', 'womanInTuxedo', 'tinfoil', 'abducted', 'oldGus', 'wading', 'trashed', 'weapon'];
 const DRESSES = new Set(['short_dress', 'sundress', 'ball_gown']);
+const LEAVE_LINE = 'Too deep to step out here. Row to a bank or the dock.';
 
 export class Game {
   readonly world: World;
@@ -89,6 +95,10 @@ export class Game {
   readonly pickups: PickupSystem;
   readonly held: HeldItem;
   readonly npcs: NpcManager;
+  readonly combat: CombatSystem;
+  readonly boat: Boat;
+  /** Rowing (§6 "Boat"): the player sits in the boat; movement keys row it. */
+  inBoat = false;
   readonly hud: Hud;
   readonly bus = new EventBus();
   readonly loop: GameLoop;
@@ -140,6 +150,9 @@ export class Game {
   private tradeResolve: (() => void) | null = null;
   private bubblePositions = new Map<string, { x: number; y: number } | null>();
   private eventHost: EventHost;
+  private startedInDress: boolean;
+  private riverOutfitSeen = false;
+  private restoreInBoat = false;
 
   private constructor(host: GameHost, player: Player, source: GameSource) {
     this.host = host;
@@ -214,6 +227,14 @@ export class Game {
     this.npcs = new NpcManager(this.world);
     this.fishing = new FishingSystem(this.world, player, this.fishingHost());
     this.held = new HeldItem(player.character);
+    // the rowboat waits at the dock unless a save left it elsewhere (§7.1 #7)
+    const dockSpot = this.dockSpot();
+    const savedBoat = 'save' in source ? source.save.world.boat : null;
+    this.boat = new Boat(this.world, savedBoat ? savedBoat[0] : dockSpot.x, savedBoat ? savedBoat[2] : dockSpot.z, savedBoat ? savedBoat[3] : dockSpot.yaw);
+    this.boat.onStroke = () => this.host.audio?.oarStroke();
+    this.boat.onBump = () => this.host.audio?.boatBump();
+    this.restoreInBoat = 'save' in source && source.save.player.inBoat;
+    this.startedInDress = this.character.sex === 'female';
     this.input = new Input(canvas, host.bindings, { onCaptureLost: () => this.onCaptureLost() });
     this.console = new DevConsole(host.ui, this.commands());
     this.console.onToggle = (open) => {
@@ -227,6 +248,7 @@ export class Game {
       this.ambience.start();
     }
     this.eventHost = this.makeEventHost();
+    this.combat = new CombatSystem(this.combatHost());
     this.loop = new GameLoop({ step: (dt) => this.step(dt), render: (dt) => this.render(dt) }, 30);
     this.applyWornOutfit();
     this.updateRodSelection();
@@ -271,6 +293,7 @@ export class Game {
   // ---- lifecycle ---------------------------------------------------------------------------
   start(): void {
     this.hud.setVisible(true);
+    if (this.restoreInBoat) this.boardBoat();
     this.loop.start();
     this.input.capture();
     const area = this.world.areaAt(this.player.feet.x, this.player.feet.z);
@@ -311,6 +334,8 @@ export class Game {
     this.console.root.remove();
     this.fishing.dispose();
     this.held.dispose();
+    this.combat.dispose();
+    this.boat.dispose();
     this.pickups.clear();
     this.npcs.despawnAll();
     this.player.dispose();
@@ -340,9 +365,11 @@ export class Game {
     if (this.overlay === 'none' && !this.console.open) {
       if (inp.pressed('inventory')) this.openOverlay('inventory');
       else if (inp.pressed('journal')) this.openOverlay('journal');
+      else if (inp.pressed('map')) this.openOverlay('map');
       else if (inp.pressed('console') && import.meta.env.DEV) this.console.toggle(true);
     } else if (this.overlay === 'inventory' && inp.pressedCode(this.host.bindings.get().inventory.primary ?? 'KeyE')) this.closeOverlay();
     else if (this.overlay === 'journal' && inp.pressedCode(this.host.bindings.get().journal.primary ?? 'KeyJ')) this.closeOverlay();
+    else if (this.overlay === 'map' && inp.pressedCode(this.host.bindings.get().map.primary ?? 'KeyM')) this.closeOverlay();
     else if (this.overlay === 'dialogue' && !this.console.open) {
       if (inp.pressedCode('Space') || inp.pressedCode('Enter')) this.conversation.advance();
       for (let i = 0; i < 4; i++) if (inp.pressedCode(`Digit${i + 1}`)) this.conversation.pressChoice(i);
@@ -364,24 +391,45 @@ export class Game {
     if (inp.pressed('interact')) this.interact();
     // use item
     const sel = selectedStack(this.inventory);
+    const weaponSelected = !!sel && isWeapon(sel.id);
     if (inp.pressed('use')) {
-      if (sel && itemDef(sel.id).kind === 'rod') this.fishing.usePressed();
-      else if (sel && itemDef(sel.id).kind === 'consumable') this.useConsumable(this.inventory.selected);
+      if (sel && itemDef(sel.id).kind === 'rod') {
+        // casting from the boat only while it is nearly stopped (§6 "Boat")
+        if (this.inBoat && !canCastFromBoat(this.boat.state) && this.fishing.state.phase === 'idle') this.hud.caption('Steady the boat first.');
+        else this.fishing.usePressed();
+      } else if (sel && itemDef(sel.id).kind === 'consumable') this.useConsumable(this.inventory.selected);
     }
     if (inp.released('use') && this.fishing.rodOut) {
       const aim = this.camera.aimDirection(this.tmp);
-      const fromBridge = this.player.feet.y > this.world.heightAt(this.player.feet.x, this.player.feet.z) + 0.6;
+      const fromBridge = !this.inBoat && this.player.feet.y > this.world.heightAt(this.player.feet.x, this.player.feet.z) + 0.6;
       this.fishing.useReleased(aim, fromBridge);
     }
-    // movement
+    // weapons: hold use to aim, attack to fire or stab (§12.1)
+    this.combat.step(dt, sel, weaponSelected && inp.held('use'), inp.pressed('attack'));
+    // movement — or rowing
     const intent = { x: (inp.held('right') ? 1 : 0) - (inp.held('left') ? 1 : 0), z: (inp.held('forward') ? 1 : 0) - (inp.held('back') ? 1 : 0), sprint: inp.held('sprint'), jump: inp.pressed('jump') };
     const wasGrounded = this.player.grounded;
-    if (!this.player.frozen) {
+    if (this.inBoat) {
+      const r = this.boat.step(dt, { forward: intent.z, turn: intent.x });
+      this.stats.boatMetres += r.moved;
+      const seat = this.boat.seat(this.tmp);
+      this.player.teleport(seat, this.boat.state.yaw);
+      if (r.moved > 0.01) this.fishing.forceReel();
+    } else if (!this.player.frozen) {
       this.player.step(dt, intent, this.camera.basis(), this.elapsed);
       if (intent.jump && wasGrounded && this.player.grounded === false) this.host.audio?.jump();
       if (!wasGrounded && this.player.grounded && this.player.airTime === 0) this.host.audio?.land();
     }
+    // aiming: the body faces where the camera looks (§12.1 over-the-shoulder)
+    if (this.combat.aiming && !this.inBoat) {
+      const want = this.camera.yaw + Math.PI;
+      let d = want - this.player.yaw;
+      d = Math.atan2(Math.sin(d), Math.cos(d));
+      this.player.yaw += d * (1 - Math.exp(-14 * dt));
+      this.player.character.root.rotation.y = this.player.yaw;
+    }
     this.updateRodSelection();
+    this.wearTime(dt);
     this.npcs.step(dt);
     this.world.physics.step();
     this.footsteps();
@@ -432,6 +480,100 @@ export class Game {
     inp.endStep();
   }
 
+  /** Breezy / Dapper (§13): a full in-game day in a dress or a tuxedo, as a character who didn't start in one. */
+  private wearTime(dt: number): void {
+    const full = this.inventory.worn.full?.id;
+    if (!full) return;
+    if (!this.startedInDress && DRESSES.has(full)) {
+      this.stats.dressWornSeconds += dt;
+      if (this.stats.dressWornSeconds >= TUNABLES.clock.dayLengthSeconds && !this.achievements.breezy) this.unlockChecks();
+    }
+    if (full === 'tuxedo') {
+      this.stats.tuxedoWornSeconds += dt;
+      if (this.stats.tuxedoWornSeconds >= TUNABLES.clock.dayLengthSeconds && !this.achievements.dapper) this.unlockChecks();
+    }
+  }
+
+  /** Dressed by the River (§13): everything worn on top, below and on the feet was fished up. */
+  private checkRiverOutfit(): void {
+    if (this.riverOutfitSeen) return;
+    const w = this.inventory.worn;
+    const fished = (s: ItemStack | undefined): boolean => !!s && this.journal.fishedGarments.includes(garmentKey(s.id, s.color));
+    const body = w.full ? fished(w.full) : fished(w.top) && fished(w.bottom);
+    if (body && fished(w.shoes)) {
+      this.riverOutfitSeen = true;
+      this.stats.riverOutfits++;
+      this.unlockChecks();
+    }
+  }
+
+  // ---- the boat (§6 "Boat", §7.1 #7) ------------------------------------------------------------
+  /** Where the boat waits: alongside the dock's end, in the channel. */
+  private dockSpot(): { x: number; z: number; yaw: number } {
+    const v = this.world.valley;
+    const z = v.dock.end[2] + 2.6;
+    return { x: v.riverCenterX(z), z, yaw: 0 };
+  }
+
+  private boardBoat(): void {
+    if (this.inBoat) return;
+    this.fishing.forceReel();
+    this.inBoat = true;
+    this.player.frozen = true;
+    this.player.locked = true;
+    this.player.depth = 1; // "in the water" for anyone reaching from the bank (a thief robs from the bank)
+    this.player.teleport(this.boat.seat(this.tmp), this.boat.state.yaw);
+    const an = this.player.character.animator;
+    an.play('sit_enter', { fade: 0.15, loop: false, onFinished: () => an.play('sit_idle', { fade: 0.2 }) });
+    this.hud.toast('W/S row, A/D turn, F to step out at a bank or the dock.');
+    this.bus.emit('boarded', { inBoat: true });
+  }
+
+  /** Step out onto the nearest bank or the dock, if either is close enough. */
+  private leaveBoat(force = false): boolean {
+    if (!this.inBoat) return false;
+    const b = this.boat.state;
+    const v = this.world.valley;
+    const at = new THREE.Vector3(b.x, 0, b.z);
+    let spot: THREE.Vector3 | null = null;
+    const dockEnd = new THREE.Vector3(v.dock.end[0], v.dock.end[1], v.dock.end[2]);
+    if (dockEnd.distanceTo(at) < TUNABLES.boat.leaveRange + 1.5) {
+      // onto the dock, a step back from its end
+      const root = new THREE.Vector3(v.dock.root[0], v.dock.root[1], v.dock.root[2]);
+      spot = dockEnd.clone().lerp(root, 0.25);
+      spot.y = v.dock.root[1] + 0.06;
+    } else {
+      const land = this.npcs.nav.landPoint(at, 1.0);
+      if (land.distanceTo(at) < TUNABLES.boat.leaveRange) spot = land;
+    }
+    if (!spot) {
+      if (force) spot = this.npcs.nav.landPoint(at, 1.2);
+      else {
+        this.hud.caption(LEAVE_LINE);
+        return false;
+      }
+    }
+    this.fishing.forceReel();
+    this.inBoat = false;
+    this.player.frozen = false;
+    this.player.locked = false;
+    this.player.teleport(spot, this.player.yaw);
+    this.player.character.animator.play('idle', { fade: 0.2 });
+    this.bus.emit('boarded', { inBoat: false });
+    return true;
+  }
+
+  /** After a death the boat goes back to the dock (§12.4). */
+  private returnBoat(): void {
+    if (this.inBoat) this.leaveBoat(true);
+    const d = this.dockSpot();
+    this.boat.place(d.x, d.z, d.yaw);
+  }
+
+  private nearBoat(): boolean {
+    return !this.inBoat && this.player.feet.distanceTo(this.boat.position) < TUNABLES.boat.boardRange;
+  }
+
   private tickDirector(dt: number): void {
     const d = this.director;
     const quiet = !this.activeEvent && !this.npcs.anyWithin(this.player.feet, TUNABLES.serenity.quietRadius);
@@ -458,7 +600,7 @@ export class Game {
     const day = this.clock.day;
     return {
       phase: phaseOf(this.clock), now: this.now(), areaId: this.world.areaAt(p.x, p.z)?.id ?? null, waterDistance: Math.max(0, v.edgeDistance(p.x, p.z)), waterKind: zone?.water ?? null,
-      hasFish: this.inventory.slots.some((s) => s && itemDef(s.id).kind === 'fish'), inBoat: false, underBridge: v.edgeDistance(p.x, p.z) < 0 && p.y < 0.5 && this.world.groundAt(p.x, p.z + 0, p.y + 4) > p.y + 1,
+      hasFish: this.inventory.slots.some((s) => s && itemDef(s.id).kind === 'fish'), inBoat: this.inBoat, underBridge: v.edgeDistance(p.x, p.z) < 0 && p.y < 0.5 && this.world.groundAt(p.x, p.z + 0, p.y + 4) > p.y + 1,
       saveMinutes: this.playTime / 60, lineOut: this.fishing.lineOut, grudgeReady: NPCS.some((n) => this.memories[n.id] && grudgeReady(this.memories[n.id]!, day)), wadingMarshNight: this.player.depth > 0.05 && zone?.water === 'marsh' && phaseOf(this.clock) === 'night',
     };
   }
@@ -492,7 +634,9 @@ export class Game {
       this.fishing.render();
       this.npcs.render(dt, this.camera.camera.position);
       if (!this.eventStarting) this.activeEvent?.render(dt);
+      this.combat.render(dt);
     }
+    this.boat.render(this.elapsed);
     this.conversation.update(dt);
     this.camera.update(dt, this.player.feet, this.world.physics, (x, z) => this.world.heightAt(x, z), this.player.body.collider);
     const camPos = this.camera.camera.position;
@@ -511,16 +655,22 @@ export class Game {
     const near = this.pickups.nearest(this.player.feet);
     const npc = this.overlay === 'none' ? this.npcs.nearestTalkable(this.player.feet) : null;
     let prompt: string | null = null;
-    if (npc) prompt = `F — Talk to ${npc.def.name}`;
+    if (this.inBoat) prompt = 'F — Leave the boat';
+    else if (npc) prompt = `F — Talk to ${npc.def.name}`;
     else if (near) prompt = `F — Pick up ${itemDef(near.itemId).name}${near.count > 1 ? ` ×${near.count}` : ''}`;
+    else if (this.nearBoat() && this.overlay === 'none') prompt = 'F — Board the boat';
+    const aim = this.combat.hudState();
     this.hud.update(
       {
         hearts: this.health.hearts, maxHearts: TUNABLES.health.maxHearts, serenity: this.serenity, clockText: formatClock(this.clock), day: this.clock.day,
         hotbar: this.inventory.slots.slice(0, 9), selected: this.inventory.selected, prompt, castCharge: this.fishing.state.phase === 'charging' ? this.fishing.state.charge : null,
         bite: this.fishing.state.phase === 'bite', lineOut: this.fishing.lineOut, captured: this.input.isCaptured || this.overlay !== 'none', biteIndicator: this.host.settings.get().gameplay.biteIndicator, saving: this.saving,
+        aiming: aim.aiming, aim: aim.aim, ammo: aim.ammo, reloading: aim.reloading, boat: this.inBoat,
       },
       dt,
     );
+    const anchor = this.combat.targetAnchor(this.tmp);
+    this.hud.placeTarget(anchor ? this.project(anchor) : null);
     this.placeBubbles();
     if (this.statsOverlay) {
       const s = this.loop.stats();
@@ -600,6 +750,7 @@ export class Game {
     for (const [g, c] of Object.entries(o.colors)) this.player.character.setGarmentColor(g, c);
     this.previewForInventory?.setOutfit({ top: o.garments.top, bottom: o.garments.bottom, full: o.garments.full, shoes: o.garments.shoes, hat: o.garments.hat });
     if (this.previewForInventory?.current) for (const [g, c] of Object.entries(o.colors)) this.previewForInventory.current.setGarmentColor(g, c);
+    this.checkRiverOutfit();
   }
 
   /** Add to the inventory or drop at the feet when full (§8.1). */
@@ -625,19 +776,39 @@ export class Game {
   }
 
   private interact(): void {
+    if (this.inBoat) {
+      this.leaveBoat();
+      return;
+    }
     const npc = this.npcs.nearestTalkable(this.player.feet);
     if (npc) {
       void this.talkTo(npc);
       return;
     }
     const near = this.pickups.nearest(this.player.feet);
-    if (!near) return;
-    this.pickUp(near.id);
+    if (near) {
+      this.pickUp(near.id);
+      return;
+    }
+    if (this.nearBoat()) this.boardBoat();
   }
 
   private pickUp(pickupId: string): void {
     const rec = this.pickups.take(pickupId);
     if (!rec) return;
+    if (rec.contents) {
+      // a loot bag (§12.2): everything inside; what doesn't fit lands at the feet
+      const names: string[] = [];
+      for (const s of rec.contents) {
+        this.give(s.id, s.count, s.color);
+        names.push(`${itemDef(s.id).name}${s.count > 1 ? ` ×${s.count}` : ''}`);
+      }
+      this.host.audio?.pickup();
+      this.hud.toast(names.length ? `Loot bag: ${names.join(', ')}` : 'An empty bag. Still a bag.', 'catch');
+      this.bus.emit('itemPickedUp', { itemId: 'loot_bag', count: 1 });
+      this.updateRodSelection();
+      return;
+    }
     const r = addItem(this.inventory, { id: rec.itemId, count: rec.count, ...(rec.color ? { color: rec.color } : {}) });
     if (r.leftover > 0) {
       this.pickups.spawn(rec.itemId, r.leftover, new THREE.Vector3(...rec.position), rec.color);
@@ -721,7 +892,9 @@ export class Game {
   /** Red poof, wake at the trailhead bench, fish lost (§12.4). */
   die(): void {
     this.endEvent(true);
+    this.combat.reset();
     this.conversation.close('died');
+    this.returnBoat();
     const lost = removeAllFish(this.inventory);
     respawn(this.health);
     this.stats.deaths++;
@@ -840,7 +1013,7 @@ export class Game {
       oldGus: hasItem(inv, 'fish_old_gus'),
       wading: this.player.depth > 0.05,
       trashed: !!zone && isTrashed(this.zones.get(zone.id)!) && this.world.valley.edgeDistance(p.x, p.z) < 25,
-      weapon: false,
+      weapon: this.combat.weaponDrawn,
     };
     const cat = BARK_ORDER.find((c) => applies[c]);
     if (!cat) return null;
@@ -935,7 +1108,54 @@ export class Game {
         const list = NPCS.filter((n) => g.memories[n.id] && grudgeReady(g.memories[n.id]!, day) && !isOutOfPool(g.memories[n.id]!, g.now()) && !g.npcs.get(n.id));
         return list.length ? list[Math.floor(g.rng.next() * list.length)]! : null;
       },
+      setStance: (id, stance) => g.combat.setStance(id, stance),
+      stanceOf: (id) => g.combat.stanceOf(id),
+      engageHostile: (npc, wasInnocent) => g.combat.makeHostile(npc, wasInnocent),
+      npcGoods: (def) => g.theirGoods(def),
+      inBoat: () => g.inBoat,
+      rockBoat: () => g.boat.rockBoat(),
     };
+  }
+
+  private combatHost(): CombatHost {
+    const g = this;
+    return {
+      get world() { return g.world; },
+      get npcs() { return g.npcs; },
+      get player() { return g.player; },
+      get camera() { return g.camera; },
+      get audio() { return g.host.audio; },
+      get rng() { return g.rng; },
+      get inventory() { return g.inventory; },
+      get stats() { return g.stats; },
+      get director() { return g.director; },
+      get bus() { return g.bus; },
+      memoryFor: (id) => g.memoryFor(id),
+      npcGoods: (def) => g.theirGoods(def),
+      now: () => g.now(),
+      toast: (t, k) => g.hud.toast(t, k),
+      caption: (t) => g.hud.caption(t),
+      bubble: (n, t, s) => g.hud.bubble(n.def.id, t, s),
+      give: (id, n, c) => g.give(id, n, c),
+      damage: (h, k) => g.hurt(h, k),
+      talk: (npc, tree, opts) => g.talkWith(npc, tree, opts),
+      isDialogueOpen: () => g.conversation.open,
+      spawnLoot: (at, contents) => void g.pickups.spawnBag(at, contents),
+      unlockChecks: () => g.unlockChecks(),
+      save: (r) => g.save(r),
+      activeRunner: () => (g.eventStarting ? null : g.activeEvent),
+      handsUpLine: (def) => g.sheetLine(def, 'hands_up') ?? 'Okay! Okay! Hands up! Please don\'t!',
+      fightBackLine: (def) => g.sheetLine(def, 'fight_back') ?? "Oh, it's like THAT?",
+    };
+  }
+
+  /** A line from a named node of the NPC's dialogue sheet (hands_up, fight_back), or null. */
+  private sheetLine(def: NpcDef, node: string): string | null {
+    const n = dialogueFor(def.id).tree.nodes[node];
+    const say = n?.say;
+    if (!say) return null;
+    const pool = typeof say === 'string' ? [say] : say;
+    return pool[Math.floor(this.rng.next() * pool.length)] ?? null;
   }
 
   // ---- conversations (§10.3) --------------------------------------------------------------------
@@ -948,6 +1168,7 @@ export class Game {
   async talkTo(npc: Npc): Promise<string> {
     const def = npc.def;
     const d = dialogueFor(def.id);
+    if (def.id === 'carl' && this.inventory.worn.hat?.id === 'tinfoil_hat') this.stats.tinfoilTalks++;
     const bark = this.barkFor(def) ?? undefined;
     return this.talkWith(npc, d.tree, { name: def.name, ...(bark ? { bark } : {}) });
   }
@@ -1015,7 +1236,7 @@ export class Game {
       },
       relationship: mem.relationship, phase: phaseOf(this.clock), flags: mem.flags, met: mem.met > 1, robbed: mem.robbed > 0, stoleFrom: hasStolenLoot(mem), poofed: mem.poofed > 0,
       recentEvent: (t) => isEventType(t) && recentEvent(this.director, t, this.now()),
-      weaponDrawn: false, trader: !!def?.trading, rng: () => this.rng.next(),
+      weaponDrawn: this.combat.weaponDrawn, trader: !!def?.trading, rng: () => this.rng.next(),
     };
   }
 
@@ -1194,6 +1415,7 @@ export class Game {
       this.stats.fishCaught++;
       if (phaseOf(this.clock) === 'night') this.stats.nightCatches++;
       this.stats.bestFishLb = Math.max(this.stats.bestFishLb, c.weightLb);
+      if (this.inBoat) this.stats.boatCatches++;
       fits = this.give(`fish_${c.fishId}`, 1);
       this.hud.toast(`${f.name} — ${formatWeight(c.weightLb)}${newRecord && !newSpecies ? ' · New record!' : newSpecies ? ' · New species!' : ''}`, 'catch');
       if (!fits) this.hud.toast('Your pockets are full. The fish looks relieved.', 'warn');
@@ -1205,8 +1427,11 @@ export class Game {
       else this.stats.junkCaught++;
       if (c.itemId === 'old_boot') this.stats.bootsCaught++;
       if (c.itemId === 'handgun' || c.itemId === 'rifle') this.stats.firearmsCaught++;
-      fits = this.give(c.itemId, 1, c.color);
-      this.hud.toast(`You fished up: ${def.name}`, 'catch');
+      if (def.kind === 'clothing') recordFishedGarment(this.journal, c.itemId, c.color);
+      // ammo comes up by the box (§8.3): one inventory unit is one round
+      const count = def.kind === 'ammo' ? (def.ammoCount ?? 1) : 1;
+      fits = this.give(c.itemId, count, c.color);
+      this.hud.toast(`You fished up: ${def.name}${count > 1 ? ` (${count} rounds)` : ''}`, 'catch');
       if (!fits) this.hud.toast('Your pockets are full. It lands at your feet.', 'warn');
       if (c.itemId === 'message_bottle') this.readBottle();
       this.host.audio?.catchSplash();
@@ -1304,7 +1529,15 @@ export class Game {
       }
       case 'journal':
         this.loop.paused = this.host.settings.get().gameplay.pauseInConversations;
-        this.overlayEl = journalScreen({ journal: this.journal, stats: this.stats, achievements: this.achievements, npcs: this.memories, onClose: () => this.closeOverlay() });
+        this.overlayEl = journalScreen({
+          journal: this.journal, stats: this.stats, achievements: this.achievements, npcs: this.memories,
+          progress: (id) => achievementProgress(id, { stats: this.stats, journal: this.journal, serenity: this.serenity, calmSeconds: this.calmSeconds, playTimeSeconds: this.playTime }),
+          onClose: () => this.closeOverlay(),
+        });
+        break;
+      case 'map':
+        this.loop.paused = this.host.settings.get().gameplay.pauseInConversations;
+        this.overlayEl = mapScreen({ valley: this.world.valley, zones: this.zones, player: { x: this.player.feet.x, z: this.player.feet.z, yaw: this.player.yaw }, boat: { x: this.boat.state.x, z: this.boat.state.z }, onClose: () => this.closeOverlay() });
         break;
       case 'dialogue':
         // the world keeps running unless the setting says otherwise (§1 #4)
@@ -1351,8 +1584,8 @@ export class Game {
       playTimeSeconds: Math.round(this.playTime),
       thumbnail: this.thumbnail(),
       character: this.character,
-      player: { position: [p.x, p.y, p.z], facing: this.player.yaw, health: this.health.hearts, inBoat: false, inventory: this.inventory },
-      world: { clock: { ...this.clock }, zones, boat: null, pickups: this.pickups.serialize() },
+      player: { position: [p.x, p.y, p.z], facing: this.player.yaw, health: this.health.hearts, inBoat: this.inBoat, inventory: this.inventory },
+      world: { clock: { ...this.clock }, zones, boat: [this.boat.state.x, 0, this.boat.state.z, this.boat.state.yaw], pickups: this.pickups.serialize() },
       npcs: this.memories,
       director: toDirectorSave(this.director),
       progress: { achievements: { ...this.achievements }, stats: { ...this.stats }, journal: this.journal, serenity: this.serenity },
@@ -1515,7 +1748,6 @@ export class Game {
       },
       event: async ([type, npcId]) => {
         if (!type || !isEventType(type)) return `usage: event <${[...EVENT_BY_TYPE.keys()].join('|')}> [npcId]`;
-        if (type === 'ranger') return 'the ranger arrives in M3';
         if (self.activeEvent) return `an event is already active: ${self.activeEvent.type}`;
         const ok = await self.startEvent(type, npcId && isKnownNpc(npcId) ? npcId : undefined);
         return ok ? `event ${type} started` : `event ${type} could not start here`;
@@ -1551,7 +1783,11 @@ export class Game {
       director: ([mode]) => {
         if (mode === 'off') self.directorEnabled = false;
         else if (mode === 'on') self.directorEnabled = true;
-        else if (mode === 'now') self.director.nextEventAt = self.director.sessionSeconds;
+        else if (mode === 'now') {
+          // right now: the gap and the minimum gap after the last event both count as elapsed
+          self.director.nextEventAt = self.director.sessionSeconds;
+          self.director.lastEventEndedAt = -1e9;
+        }
         return `director ${self.directorEnabled ? 'on' : 'off'}; next event in ${(self.director.nextEventAt - self.director.sessionSeconds).toFixed(0)} s; grace ${Math.max(0, self.director.graceUntil - self.director.sessionSeconds).toFixed(0)} s`;
       },
       tutorial: ([mode]) => {
@@ -1576,6 +1812,46 @@ export class Game {
         return `${npcDef(id).name} holds a grudge`;
       },
       memory: ([id]) => (id && isKnownNpc(id) ? JSON.stringify(self.memories[id] ?? null) : 'usage: memory <npcId>'),
+      // M3 (§12, §6 "Boat")
+      poof: ([id]) => {
+        const npc = id ? self.npcs.get(id) : null;
+        if (!npc) return 'usage: poof <npcId> (an NPC standing in the world)';
+        self.combat.poof(npc);
+        return `${npc.def.name} poofed`;
+      },
+      hostile: ([id]) => {
+        const npc = id ? self.npcs.get(id) : null;
+        if (!npc) return 'usage: hostile <npcId> (an NPC standing in the world)';
+        self.combat.makeHostile(npc, true);
+        return `${npc.def.name} is hostile`;
+      },
+      stance: ([id, stance]) => {
+        if (!id || !self.npcs.get(id)) return 'usage: stance <npcId> innocent|threatening|hostile';
+        if (stance === 'innocent' || stance === 'threatening') self.combat.setStance(id, stance);
+        else if (stance === 'hostile') self.combat.makeHostile(self.npcs.get(id)!, false);
+        return `${id}: ${self.combat.stanceOf(id)}`;
+      },
+      combat: () => JSON.stringify(self.combat.debugState()),
+      boat: ([where]) => {
+        if (where === 'here') {
+          // bring the boat to the channel beside the player
+          const p = self.player.feet;
+          const v = self.world.valley;
+          self.boat.place(v.riverCenterX(p.z), p.z, 0);
+          return `boat at ${self.boat.state.x.toFixed(1)}, ${self.boat.state.z.toFixed(1)}`;
+        }
+        if (where === 'dock') {
+          self.returnBoat();
+          return 'boat at the dock';
+        }
+        return `boat at ${self.boat.state.x.toFixed(1)}, ${self.boat.state.z.toFixed(1)} yaw ${self.boat.state.yaw.toFixed(2)}; usage: boat here|dock`;
+      },
+      board: () => {
+        if (self.inBoat) return 'already aboard';
+        self.boardBoat();
+        return 'aboard';
+      },
+      leave: () => (self.leaveBoat() ? 'ashore' : self.inBoat ? LEAVE_LINE : 'not in the boat'),
       pos: () => `${self.player.feet.x.toFixed(2)} ${self.player.feet.y.toFixed(2)} ${self.player.feet.z.toFixed(2)} yaw ${self.player.yaw.toFixed(2)}`,
     };
   }
@@ -1601,6 +1877,9 @@ export class Game {
         event: this.activeEvent ? { type: this.activeEvent.type, phase: this.activeEvent.phase } : null,
         npcs: [...this.npcs.active.values()].map((n) => ({ id: n.def.id, pos: n.feet.toArray(), mode: n.mode, tag: n.tag })),
         dialogue: this.conversation.current,
+        combat: this.combat.debugState(),
+        boat: { x: this.boat.state.x, z: this.boat.state.z, yaw: this.boat.state.yaw, speed: this.boat.state.speed, inBoat: this.inBoat, metres: this.stats.boatMetres },
+        pickupList: this.pickups.serialize().map((p) => ({ id: p.id, itemId: p.itemId, pos: p.position, contents: p.contents?.map((c) => `${c.id}×${c.count}`) })),
         director: { enabled: this.directorEnabled, sessionSeconds: this.director.sessionSeconds, nextIn: this.director.nextEventAt - this.director.sessionSeconds, grace: this.director.graceUntil - this.director.sessionSeconds, lull: this.director.lull, wanted: this.director.wanted, ufoRecentUntil: this.director.ufoRecentUntil, eventsRun: this.director.eventsRun },
         memories: Object.fromEntries(Object.entries(this.memories).map(([k, m]) => [k, { met: m.met, relationship: m.relationship, grudge: m.grudge, stolen: m.stolen.length, poofed: m.poofed }])),
         people: [...this.journal.people],
@@ -1654,6 +1933,37 @@ export class Game {
         return true;
       },
       dealTrade: (offer: string[], ask: string[]) => this.dealTradeByIds(offer, ask),
+      // M3 hooks
+      /** Point the camera so the crosshair ray passes through an NPC's chest. */
+      aimAt: (id: string) => {
+        const npc = this.npcs.get(id);
+        if (!npc) return false;
+        const cam = this.camera;
+        const target = new THREE.Vector3(npc.feet.x, npc.feet.y + 1.15 * npc.def.look.scale, npc.feet.z);
+        // the camera orbits the player's head; face the target from there
+        const eye = new THREE.Vector3(this.player.feet.x, this.player.feet.y + TUNABLES.camera.height, this.player.feet.z);
+        let d = target.clone().sub(eye);
+        cam.yaw = Math.atan2(-d.x, -d.z);
+        // the aim camera looks through a point off the right shoulder: aim from there instead
+        if (this.combat.aiming) {
+          const shoulder = eye.clone().add(new THREE.Vector3(-Math.cos(cam.yaw) * 0.55, 0.05, Math.sin(cam.yaw) * 0.55));
+          d = target.clone().sub(shoulder);
+          cam.yaw = Math.atan2(-d.x, -d.z);
+        }
+        const flat = Math.hypot(d.x, d.z);
+        cam.pitch = Math.max(TUNABLES.camera.minPitch, Math.min(TUNABLES.camera.maxPitch, -Math.atan2(d.y, flat) + 0.06));
+        return true;
+      },
+      pickupAll: (radius = 4) => {
+        const near = this.pickups.serialize().filter((p) => Math.hypot(p.position[0] - this.player.feet.x, p.position[2] - this.player.feet.z) < radius);
+        for (const p of near) this.pickUp(p.id);
+        return near.length;
+      },
+      board: () => {
+        this.boardBoat();
+        return this.inBoat;
+      },
+      leave: () => this.leaveBoat(),
     };
   }
 

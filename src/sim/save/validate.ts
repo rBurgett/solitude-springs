@@ -79,6 +79,7 @@ function validateJournal(v: unknown): JournalState {
   }
   if (Array.isArray(v.messages)) j.messages = v.messages.filter((m): m is string => typeof m === 'string').slice(0, 200).map((m) => m.slice(0, 64));
   if (Array.isArray(v.people)) j.people = v.people.filter((m): m is string => typeof m === 'string').slice(0, 200).map((m) => m.slice(0, 64));
+  if (Array.isArray(v.fishedGarments)) j.fishedGarments = v.fishedGarments.filter((m): m is string => typeof m === 'string' && /^[a-z_]{1,32}:(#[0-9a-f]{6})?$/i.test(m)).slice(0, 400);
   return j;
 }
 
@@ -124,6 +125,7 @@ export function validateDirector(v: unknown): DirectorSave {
   return {
     wanted: num(d.wanted, 0, 0, 10), ufoRecentUntil: num(d.ufoRecentUntil, 0, 0, 1e7), lull: bool(d.lull, false), sessionSeconds: num(d.sessionSeconds, 0, 0, 1e8),
     cooldownsRemaining, lullScheduledDay: int(d.lullScheduledDay, 0, 0, 1e6), lullAtFraction: num(d.lullAtFraction, -1, -1, 1), recent, eventsRun: int(d.eventsRun, 0, 0, 1e7),
+    rangersBoth: bool(d.rangersBoth, false),
   };
 }
 
@@ -193,7 +195,8 @@ export function validateSave(input: unknown): SaveRecord | null {
       if (!isObj(pk)) continue;
       const s = stack({ id: pk.itemId, count: pk.count, color: pk.color });
       if (!s) continue;
-      world.pickups.push({ id: str(pk.id, '', 64) || `${world.pickups.length}`, itemId: s.id, count: s.count, ...(s.color ? { color: s.color } : {}), position: vec3(pk.position, [0, 0, 0]) });
+      const contents = stackList(pk.contents, 40);
+      world.pickups.push({ id: str(pk.id, '', 64) || `${world.pickups.length}`, itemId: s.id, count: s.count, ...(s.color ? { color: s.color } : {}), position: vec3(pk.position, [0, 0, 0]), ...(contents.length ? { contents } : {}) });
     }
   }
   const pr = isObj(v.progress) ? v.progress : {};

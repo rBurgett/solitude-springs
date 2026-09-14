@@ -30,6 +30,8 @@ export interface DirectorState {
   eventsRun: number;
   /** Day+fraction of the last occurrence of each event type (for "recently" barks and requirements). */
   recent: Partial<Record<EventType, number>>;
+  /** A ranger was poofed: the next ranger event sends both (§12.3). */
+  rangersBoth: boolean;
 }
 
 /** What the save keeps (plan §14.2): pacing phase, cooldowns as remaining seconds, wanted, lull, ufo. */
@@ -43,13 +45,14 @@ export interface DirectorSave {
   lullAtFraction: number;
   recent: Partial<Record<EventType, number>>;
   eventsRun: number;
+  rangersBoth: boolean;
 }
 
 export function createDirector(newGame: boolean, rng: () => number): DirectorState {
   const grace = newGame ? D.graceSecondsNewGame : D.graceSecondsAfterLoad;
   const d: DirectorState = {
     wanted: 0, ufoRecentUntil: 0, lull: false, sessionSeconds: 0, graceUntil: grace, nextEventAt: 0, lullUntil: 0, lullAtFraction: -1, lullScheduledDay: 0,
-    cooldowns: {}, activeEvent: null, lastEventClass: null, lastEventEndedAt: -1e9, eventsRun: 0, recent: {},
+    cooldowns: {}, activeEvent: null, lastEventClass: null, lastEventEndedAt: -1e9, eventsRun: 0, recent: {}, rangersBoth: false,
   };
   d.nextEventAt = grace + rollGap(d, rng);
   return d;
@@ -58,7 +61,7 @@ export function createDirector(newGame: boolean, rng: () => number): DirectorSta
 export function toDirectorSave(d: DirectorState): DirectorSave {
   const cooldownsRemaining: Partial<Record<EventType, number>> = {};
   for (const [k, at] of Object.entries(d.cooldowns) as [EventType, number][]) if (at > d.sessionSeconds) cooldownsRemaining[k] = Math.round(at - d.sessionSeconds);
-  return { wanted: d.wanted, ufoRecentUntil: d.ufoRecentUntil, lull: d.lull, sessionSeconds: d.sessionSeconds, cooldownsRemaining, lullScheduledDay: d.lullScheduledDay, lullAtFraction: d.lullAtFraction, recent: { ...d.recent }, eventsRun: d.eventsRun };
+  return { wanted: d.wanted, ufoRecentUntil: d.ufoRecentUntil, lull: d.lull, sessionSeconds: d.sessionSeconds, cooldownsRemaining, lullScheduledDay: d.lullScheduledDay, lullAtFraction: d.lullAtFraction, recent: { ...d.recent }, eventsRun: d.eventsRun, rangersBoth: d.rangersBoth };
 }
 
 export function fromDirectorSave(s: DirectorSave, rng: () => number): DirectorState {
@@ -74,6 +77,7 @@ export function fromDirectorSave(s: DirectorSave, rng: () => number): DirectorSt
   d.lullAtFraction = s.lullAtFraction;
   d.recent = { ...s.recent };
   d.eventsRun = s.eventsRun;
+  d.rangersBoth = s.rangersBoth;
   return d;
 }
 

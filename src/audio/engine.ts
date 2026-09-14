@@ -244,4 +244,53 @@ export class AudioEngine {
   cheer(): void {
     this.burst('effects', 0.2, 0.05, 0.5, 1500, 0.5);
   }
+  // ---- M3 weapons and the boat (§15 "Events": punchy, not gory) ----
+  gunshot(kind: 'handgun' | 'rifle'): void {
+    const t = this.now;
+    const big = kind === 'rifle';
+    this.burst('effects', big ? 0.9 : 0.7, 0.003, big ? 0.22 : 0.14, big ? 700 : 1100, 0.5, t);
+    this.tone('effects', big ? 110 : 160, 'square', 0.35, 0.003, big ? 0.16 : 0.1, { slideTo: 50, at: t });
+    // a little tail off the trees
+    this.burst('effects', 0.12, 0.05, big ? 0.5 : 0.3, 500, 0.4, t + 0.08);
+  }
+  knifeSwish(): void {
+    this.burst('effects', 0.25, 0.02, 0.12, 2600, 0.7);
+  }
+  /** The trigger stops short (an innocent in the sights) or the magazine is empty. */
+  dryClick(): void {
+    this.tone('effects', 1400, 'square', 0.12, 0.002, 0.03);
+    this.tone('effects', 700, 'square', 0.08, 0.002, 0.04, { at: this.now + 0.05 });
+  }
+  reloadClack(): void {
+    const t = this.now;
+    this.tone('effects', 900, 'square', 0.1, 0.002, 0.04, { at: t });
+    this.tone('effects', 600, 'square', 0.1, 0.002, 0.05, { at: t + 0.35 });
+    this.tone('effects', 1100, 'square', 0.1, 0.002, 0.04, { at: t + 0.9 });
+  }
+  /** A hit landing on a person: a cartoon thump, nothing wet. */
+  thump(): void {
+    this.tone('effects', 180, 'triangle', 0.3, 0.004, 0.12, { slideTo: 90 });
+    this.burst('effects', 0.15, 0.005, 0.08, 800, 0.8);
+  }
+  /** The red poof: a pop, a puff and a little rising whistle. */
+  poofPop(): void {
+    const t = this.now;
+    this.tone('effects', 320, 'sine', 0.45, 0.003, 0.08, { slideTo: 90, at: t });
+    this.burst('effects', 0.5, 0.01, 0.35, 900, 0.5, t);
+    this.tone('effects', 600, 'sine', 0.12, 0.05, 0.5, { slideTo: 1500, at: t + 0.05 });
+  }
+  oarStroke(): void {
+    this.burst('effects', 0.22, 0.03, 0.28, 900, 0.6);
+    this.tone('effects', 260, 'sine', 0.06, 0.02, 0.2, { slideTo: 180 });
+  }
+  boatBump(): void {
+    this.tone('effects', 120, 'triangle', 0.3, 0.005, 0.18, { slideTo: 70 });
+    this.burst('effects', 0.15, 0.01, 0.15, 400, 0.6);
+  }
+  /** The ranger's whistle. */
+  whistle(): void {
+    const t = this.now;
+    this.tone('effects', 2200, 'sine', 0.2, 0.02, 0.35, { slideTo: 2600, at: t });
+    this.tone('effects', 2500, 'sine', 0.2, 0.02, 0.3, { slideTo: 2100, at: t + 0.4 });
+  }
 }

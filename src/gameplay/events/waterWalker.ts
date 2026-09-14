@@ -106,6 +106,14 @@ export class WaterWalkerRunner extends EventRunner {
     this.linger = Math.max(this.linger, 45);
   }
 
+  override onRobbed(npcId: string): void {
+    if (this.npc && npcId === this.npc.def.id) this.linger = 0;
+  }
+
+  override onNpcGone(npcId: string): void {
+    if (this.npc && npcId === this.npc.def.id) this.finish();
+  }
+
   protected override cleanup(): void {
     if (this.npc) this.h.npcs.despawn(this.npc.def.id);
   }
